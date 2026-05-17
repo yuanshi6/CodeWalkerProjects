@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace CodeWalker.Forms
@@ -243,25 +242,7 @@ namespace CodeWalker.Forms
             }
             ShaderPanel.Enabled = true;
 
-            var header = BuildShaderHeader(s);
-            ShaderTextBox.Text = header + "\r\n// Disassembling... (dxc -dumpbin)\r\n";
-
-            // dxc/fxc takes 50-500ms — keep the UI responsive.
-            var binary = s.Binary;
-            var name = s.Name;
-            var stage = s.StageName;
-            Task.Run(() =>
-            {
-                string asm = ShaderDisassembler.Disassemble(binary, name, out string err);
-                string body = !string.IsNullOrEmpty(asm)
-                    ? asm
-                    : "// Disassembly unavailable.\r\n// " + (err ?? "Unknown error").Replace("\n", "\n// ");
-                BeginInvoke((Action)(() =>
-                {
-                    if (SelectedAwcShader == null || !ReferenceEquals(SelectedAwcShader.Binary, binary)) return;
-                    ShaderTextBox.Text = header + "\r\n" + body;
-                }));
-            });
+            ShaderTextBox.Text = BuildShaderHeader(s);
         }
 
         private static string BuildShaderHeader(AwcShader s)
@@ -431,8 +412,8 @@ namespace CodeWalker.Forms
                 s.Binary = bytes;
                 s.Size = (uint)bytes.Length;
                 s.BinaryDirty = true;
-                // Phase 1: keep original metadata block. Game may crash if the new
-                // CSO's resource layout differs from the original.
+                // Keep original metadata block — game may crash if the new CSO's
+                // resource layout differs from the original.
 
                 LoadAwcShader(s);
                 StatusLabel.Text = "Imported " + s.Name + " (" + oldSize + " -> " + bytes.Length + " bytes)";

@@ -9,8 +9,7 @@ using EXP = System.ComponentModel.ExpandableObjectConverter;
 // AWC Shader Library (SGD2 / Shader Group Data v2) reader & writer.
 // Used by GTA V Enhanced (Gen9) compiled-shader containers. Distinct from the
 // audio Audio Wave Container (AwcFile.cs / magic ADAT) which shares the .awc
-// extension. Ported from the Python reference parser at
-// GTATOOLS/fxc/shadermanager/awclib (parser.py, models.py, awc_writer.py).
+// extension.
 
 namespace CodeWalker.GameFiles
 {
@@ -312,8 +311,7 @@ namespace CodeWalker.GameFiles
             long afterHeader = ms.Position; // headerStart + 12
             byte[] extra = br.ReadBytes(16);
 
-            // Offsets in the binary are relative to headerStart (the parser in
-            // Python expresses this as (afterHeader + offset - 12)).
+            // Offsets in the binary are relative to headerStart.
             string regName;
             long savedPos = ms.Position;
             ms.Position = headerStart + regStringOff;
@@ -467,9 +465,8 @@ namespace CodeWalker.GameFiles
             bw.Write(block);
         }
 
-        // Mirrors awc_writer.py:_build_metadata_block. Unused in Phase 1 (binary-
-        // only imports keep MetadataDirty=false), but kept so the data model is
-        // round-trippable end-to-end.
+        // Unused while MetadataDirty stays false (binary-only imports), but kept
+        // so the data model is round-trippable end-to-end.
         private static byte[] BuildMetadataBlock(AwcShader s)
         {
             var regs = s.Registers ?? Array.Empty<AwcShaderRegister>();
