@@ -18,6 +18,7 @@ namespace CodeWalker.OIVInstaller
         private string _gameFolderEnhanced = "";
         private MarqueePainter _marquee;
         private Animator _formFadeAnimator;
+        private Animator _formResizeAnimator;
 
         public MainForm()
         {
@@ -485,7 +486,7 @@ namespace CodeWalker.OIVInstaller
                 }
                 
                 DisplayPackageInfo();
-                
+
                 if (_package.IsFiveM)
                 {
                     string fivemMods = FiveMHelper.GetFiveMModsFolder();
@@ -563,9 +564,7 @@ namespace CodeWalker.OIVInstaller
             
             if (this.ClientSize.Height != finalHeight)
             {
-                this.ClientSize = new Size(this.ClientSize.Width, finalHeight);
-                // We keep MinimumSize at what resizing allows, or reset it to safe minimum if needed
-                // But generally, for a fixed single border style, directly setting ClientSize is best
+                AnimateClientHeight(finalHeight, durationMs: 260);
             }
             
             // Information section
@@ -672,17 +671,32 @@ namespace CodeWalker.OIVInstaller
             // Sync the marquee with whatever lblPackageName ended up showing — text and
             // (theme-driven) ForeColor — and reset its scroll position for a fresh sweep.
             SyncMarqueeFromLabel();
+        }
 
-            // Stagger a slide-in for the major sections so the layout reveals progressively
-            // instead of snapping. Skip while the form isn't visible yet (cmd-line load
-            // path) — the slide can't be perceived before the window paints.
-            if (this.Visible)
+        /// <summary>
+        /// Smoothly tweens the form's ClientSize.Height between current and target.
+        /// Replaces the previous direct assignment so a new package's content size
+        /// settles instead of snapping. Width is preserved.
+        /// </summary>
+        private void AnimateClientHeight(int targetHeight, int durationMs)
+        {
+            int start = this.ClientSize.Height;
+            int delta = targetHeight - start;
+            if (delta == 0) return;
+
+            _formResizeAnimator?.Dispose();
+            _formResizeAnimator = new Animator();
+            _formResizeAnimator.Tween(durationMs, t =>
             {
-                SlideAnimator.SlideUp(rtbDescription, fromOffsetY: 12, durationMs: 280, delayMs: 0);
-                SlideAnimator.SlideUp(panelPaths,    fromOffsetY: 14, durationMs: 300, delayMs: 60);
-                SlideAnimator.SlideUp(panelInfo,     fromOffsetY: 16, durationMs: 320, delayMs: 120);
-                SlideAnimator.SlideUp(panelAdditional, fromOffsetY: 16, durationMs: 320, delayMs: 150);
-            }
+                if (this.IsDisposed) return;
+                int h = start + (int)Math.Round(delta * t);
+                if (this.ClientSize.Height != h)
+                    this.ClientSize = new Size(this.ClientSize.Width, h);
+            }, () =>
+            {
+                if (!this.IsDisposed)
+                    this.ClientSize = new Size(this.ClientSize.Width, targetHeight);
+            }, Easing.EaseOutCubic);
         }
 
         private void DisplayAuthorLinks()
@@ -1022,6 +1036,7 @@ namespace CodeWalker.OIVInstaller
             _package?.Dispose();
             _marquee?.Dispose();
             _formFadeAnimator?.Dispose();
+            _formResizeAnimator?.Dispose();
             base.OnFormClosing(e);
         }
     }
