@@ -29,7 +29,97 @@ namespace CodeWalker.OIVInstaller
             this.Opacity = 0; // fade in on Shown
             AttachButtonAnimations();
             SetupMarqueePainter();
+            SetupEmptyState();
+            SetupTitleClipResizing();
             AttachSkipBackupConfirm();
+        }
+
+        // The title clip is fixed-width in the Designer (235px) but with a resizable
+        // form, the header buttons are anchored Top|Right so they slide further from
+        // the title as the form widens — and during the empty→loaded slide tween the
+        // gap between title-left and Docs-left changes too. Reactively size the clip
+        // to fill that gap so the marquee always uses the full available space.
+        private void SetupTitleClipResizing()
+        {
+            EventHandler refresh = (s, e) => UpdateTitleClipWidth();
+            btnDocs.LocationChanged += refresh;
+            pnlTitleClipping.LocationChanged += refresh;
+            this.SizeChanged += refresh;
+        }
+
+        private void UpdateTitleClipWidth()
+        {
+            if (pnlTitleClipping == null || btnDocs == null) return;
+            int target = btnDocs.Left - pnlTitleClipping.Left - 12;
+            if (target < 80) target = 80;
+            if (pnlTitleClipping.Width != target)
+            {
+                pnlTitleClipping.Width = target;
+                pnlTitleClipping.Invalidate();
+            }
+        }
+
+        // Empty-state landing view: a dashed-border card with package glyph + hints.
+        // Shown until a package is loaded; replaced by description/info/additional via
+        // the crossfade transition in DisplayPackageInfo.
+        private void SetupEmptyState()
+        {
+            lblEmptyIcon.Text = ""; // OpenFile glyph (Segoe MDL2 Assets)
+            panelEmptyState.Paint += OnEmptyStatePaint;
+            panelEmptyState.SizeChanged += (s, e) =>
+            {
+                CenterEmptyStateContent();
+                // Panel doesn't fully invalidate on resize by default, so the previously
+                // drawn dashed border ghosts in the newly exposed area. Force repaint.
+                panelEmptyState.Invalidate();
+            };
+            // Initial centering is performed in MainForm_Load — the window handle isn't
+            // created yet here, so we can't BeginInvoke onto the UI thread.
+        }
+
+        private void OnEmptyStatePaint(object sender, System.Windows.Forms.PaintEventArgs e)
+        {
+            var g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            var rect = panelEmptyState.ClientRectangle;
+            rect.Inflate(-1, -1);
+            using (var path = RoundedRectPath(rect, 8))
+            using (var pen = new System.Drawing.Pen(Color.FromArgb(205, 212, 220), 1.4f))
+            {
+                pen.DashStyle = System.Drawing.Drawing2D.DashStyle.Custom;
+                pen.DashPattern = new float[] { 5f, 4f };
+                g.DrawPath(pen, path);
+            }
+        }
+
+        private static System.Drawing.Drawing2D.GraphicsPath RoundedRectPath(Rectangle rect, int radius)
+        {
+            var path = new System.Drawing.Drawing2D.GraphicsPath();
+            int d = radius * 2;
+            path.AddArc(rect.Left, rect.Top, d, d, 180, 90);
+            path.AddArc(rect.Right - d, rect.Top, d, d, 270, 90);
+            path.AddArc(rect.Right - d, rect.Bottom - d, d, d, 0, 90);
+            path.AddArc(rect.Left, rect.Bottom - d, d, d, 90, 90);
+            path.CloseFigure();
+            return path;
+        }
+
+        private void CenterEmptyStateContent()
+        {
+            if (panelEmptyState == null || panelEmptyState.IsDisposed) return;
+            int pw = panelEmptyState.ClientSize.Width;
+            int ph = panelEmptyState.ClientSize.Height;
+            int gapIconTitle = 6;
+            int gapTitleSub = 4;
+            int totalH = lblEmptyIcon.Height + gapIconTitle + lblEmptyTitle.Height + gapTitleSub + lblEmptySubtitle.Height;
+            int y = Math.Max(8, (ph - totalH) / 2);
+
+            lblEmptyIcon.Left = (pw - lblEmptyIcon.Width) / 2;
+            lblEmptyIcon.Top = y;
+            lblEmptyTitle.Left = (pw - lblEmptyTitle.Width) / 2;
+            lblEmptyTitle.Top = lblEmptyIcon.Bottom + gapIconTitle;
+            lblEmptySubtitle.Left = (pw - lblEmptySubtitle.Width) / 2;
+            lblEmptySubtitle.Top = lblEmptyTitle.Bottom + gapTitleSub;
         }
 
         private void AttachSkipBackupConfirm()
@@ -88,6 +178,11 @@ namespace CodeWalker.OIVInstaller
 
         private void MainForm_Load(object sender, EventArgs e)
         {
+            // Empty-state labels are AutoSize, so we wait until the form's first layout
+            // pass (Load fires after the handle is created and initial layout has run)
+            // before measuring + centering them.
+            CenterEmptyStateContent();
+
             // Check command line args for OIV file
             var args = Environment.GetCommandLineArgs();
             if (args.Length > 1 && File.Exists(args[1]) && (args[1].EndsWith(".oiv", StringComparison.OrdinalIgnoreCase) || args[1].EndsWith(".rpf", StringComparison.OrdinalIgnoreCase)))
@@ -330,6 +425,15 @@ namespace CodeWalker.OIVInstaller
             }
         }
 
+        private void linkInstructions_LinkClicked(object sender, LinkLabelLinkClickedEventArgs e)
+        {
+            if (_package == null) return;
+            using (var form = new InstructionsForm(_package))
+            {
+                form.ShowDialog(this);
+            }
+        }
+
         // Designer wires this handler to tmrMarquee.Tick. Marquee scrolling now lives in
         // MarqueePainter (custom paint with sub-pixel positioning); the timer itself is
         // stopped in SetupMarqueePainter so this body never actually runs. Kept as a
@@ -524,47 +628,55 @@ namespace CodeWalker.OIVInstaller
         private void DisplayPackageInfo()
         {
             if (_package == null) return;
-            
+
             var meta = _package.Metadata;
+            bool wasEmpty = panelEmptyState != null && panelEmptyState.Visible;
 
             // Update window title
             this.Text = $"{meta.Name} - Package Installer";
-            
+
             // Header
             lblPackageName.Text = meta.Name;
             lblAuthor.Text = meta.AuthorDisplayName;
-            
+
             // Description
             rtbDescription.Text = meta.Description.Trim();
-            
+
             // Calculate height with a cap
             Size textSize = TextRenderer.MeasureText(rtbDescription.Text, rtbDescription.Font, new Size(rtbDescription.Width, 0), TextFormatFlags.WordBreak);
-            
+
             // Cap height at 250px (scroll if larger), min 35px
             int targetHeight = Math.Min(Math.Max(textSize.Height + 20, 35), 250);
-            
+
             rtbDescription.Height = targetHeight;
-            
-            // Layout adjustment
+
+            // Compute the *loaded-state* positions for the secondary panels. When leaving
+            // the empty state we defer applying these so the crossfade snapshot still
+            // shows the empty-state layout — otherwise panelPaths would visibly teleport
+            // before the fade kicks in.
             int spacer = 20;
-            panelPaths.Top = rtbDescription.Bottom + spacer;
-            panelInfo.Top = panelPaths.Bottom + spacer;
-            panelAdditional.Top = panelPaths.Bottom + spacer;
-            
-            // Resize form to fit content
-            // We need to account for the Header (100px) and padding
-            // panelInfo.Bottom is relative to panelContent (which starts after Header)
-            int requiredClientHeight = 100 + panelInfo.Bottom + 30;
-            
+            int linkY = rtbDescription.Bottom + 4;
+            int linkH = Math.Max(linkInstructions.Height, 17);
+            int loadedPathsTop = linkY + linkH + 10;
+            int loadedInfoTop = loadedPathsTop + panelPaths.Height + spacer;
+            int requiredClientHeight = 100 + loadedInfoTop + panelInfo.Height + 30;
+
             // Hardcoded minimum height to ensure basic UI usability
             int minHeight = 460;
-            
+
             // Apply the required height, respecting the minimum
             int finalHeight = Math.Max(minHeight, requiredClientHeight);
-            
-            if (this.ClientSize.Height != finalHeight)
+
+            if (!wasEmpty)
             {
-                AnimateClientHeight(finalHeight, durationMs: 260);
+                linkInstructions.Location = new Point(20, linkY);
+                panelPaths.Top = loadedPathsTop;
+                panelInfo.Top = loadedInfoTop;
+                panelAdditional.Top = loadedInfoTop;
+                if (this.ClientSize.Height != finalHeight)
+                {
+                    AnimateClientHeight(finalHeight, durationMs: 260);
+                }
             }
             
             // Information section
@@ -671,6 +783,135 @@ namespace CodeWalker.OIVInstaller
             // Sync the marquee with whatever lblPackageName ended up showing — text and
             // (theme-driven) ForeColor — and reset its scroll position for a fresh sweep.
             SyncMarqueeFromLabel();
+
+            // Empty → loaded transition. Crossfade panelContent so the empty-state card
+            // smoothly hands off to the description/info/additional sections (and the
+            // panelPaths repositioning), while the header grows from 70→100 and slides
+            // the title back to its loaded position alongside the form's height tween.
+            if (wasEmpty)
+            {
+                ViewTransitions.CrossFade(panelContent, () =>
+                {
+                    linkInstructions.Location = new Point(20, linkY);
+                    linkInstructions.Visible = true;
+                    panelPaths.Top = loadedPathsTop;
+                    panelInfo.Top = loadedInfoTop;
+                    panelAdditional.Top = loadedInfoTop;
+                    panelEmptyState.Visible = false;
+                    rtbDescription.Visible = true;
+                    panelInfo.Visible = true;
+                    panelAdditional.Visible = true;
+                    picIcon.Visible = true;
+                    lblAuthor.Visible = true;
+                });
+                AnimateLayoutTransition(finalHeight, targetHeaderHeight: 100, durationMs: 280);
+            }
+        }
+
+        /// <summary>
+        /// One-shot transition tween covering the form's ClientSize.Height, the header's
+        /// Height, and the title clip's location — used when leaving the empty state so
+        /// the header can grow (70→100) and the title can slide back (24,18 → 93,15)
+        /// while the form expands to fit the loaded layout.
+        /// </summary>
+        private void AnimateLayoutTransition(int targetClientHeight, int targetHeaderHeight, int durationMs)
+        {
+            // Empty → loaded: reveal Install from just off-screen right; end positions
+            // are right-anchored against the current form width.
+            //   btnDocs:      Right margin 260 → Left = form_w - 100 - 260 = form_w - 360
+            //   btnUninstall: Right margin 150 → Left = form_w - 100 - 150 = form_w - 250
+            //   btnInstall:   Right margin  20 → Left = form_w - 120 -  20 = form_w - 140
+            int formWidth = this.ClientSize.Width;
+            btnInstall.Left = formWidth;
+            btnInstall.Visible = true;
+            AnimateHeaderTransition(
+                targetClientHeight, targetHeaderHeight,
+                targetTitle: new Point(93, 15),
+                targetDocsX: formWidth - 360,
+                targetUninstallX: formWidth - 250,
+                targetInstallX: formWidth - 140,
+                hideInstallAtEnd: false,
+                durationMs);
+        }
+
+        private void AnimateLayoutTransitionToEmpty(int durationMs)
+        {
+            // Loaded → empty: slide Install off-screen right and reset Docs/Manage Mods
+            // to their empty-state slots (right margins 130 / 20).
+            int formWidth = this.ClientSize.Width;
+            AnimateHeaderTransition(
+                targetClientHeight: 380, targetHeaderHeight: 70,
+                targetTitle: new Point(24, 18),
+                targetDocsX: formWidth - 230,
+                targetUninstallX: formWidth - 120,
+                targetInstallX: formWidth,
+                hideInstallAtEnd: true,
+                durationMs);
+        }
+
+        /// <summary>
+        /// Shared header-layout tween for both transition directions. Handles client
+        /// height, header height, title clip location, and the three header buttons in
+        /// one easing curve so the motion reads as a single coordinated reflow.
+        /// </summary>
+        private void AnimateHeaderTransition(
+            int targetClientHeight, int targetHeaderHeight,
+            Point targetTitle,
+            int targetDocsX, int targetUninstallX, int targetInstallX,
+            bool hideInstallAtEnd, int durationMs)
+        {
+            int startClient = this.ClientSize.Height;
+            int startHeader = panelHeader.Height;
+            Point startTitle = pnlTitleClipping.Location;
+            int startDocsX = btnDocs.Left;
+            int startUninstallX = btnUninstall.Left;
+            int startInstallX = btnInstall.Left;
+
+            int dClient = targetClientHeight - startClient;
+            int dHeader = targetHeaderHeight - startHeader;
+            int dTitleX = targetTitle.X - startTitle.X;
+            int dTitleY = targetTitle.Y - startTitle.Y;
+            int dDocsX = targetDocsX - startDocsX;
+            int dUninstallX = targetUninstallX - startUninstallX;
+            int dInstallX = targetInstallX - startInstallX;
+            if (dClient == 0 && dHeader == 0 && dTitleX == 0 && dTitleY == 0
+                && dDocsX == 0 && dUninstallX == 0 && dInstallX == 0)
+            {
+                if (hideInstallAtEnd) btnInstall.Visible = false;
+                return;
+            }
+
+            _formResizeAnimator?.Dispose();
+            _formResizeAnimator = new Animator();
+            _formResizeAnimator.Tween(durationMs, t =>
+            {
+                if (this.IsDisposed) return;
+                int h = startClient + (int)Math.Round(dClient * t);
+                int hh = startHeader + (int)Math.Round(dHeader * t);
+                int tx = startTitle.X + (int)Math.Round(dTitleX * t);
+                int ty = startTitle.Y + (int)Math.Round(dTitleY * t);
+                int dx = startDocsX + (int)Math.Round(dDocsX * t);
+                int ux = startUninstallX + (int)Math.Round(dUninstallX * t);
+                int ix = startInstallX + (int)Math.Round(dInstallX * t);
+                if (panelHeader.Height != hh) panelHeader.Height = hh;
+                if (this.ClientSize.Height != h)
+                    this.ClientSize = new Size(this.ClientSize.Width, h);
+                if (pnlTitleClipping.Left != tx || pnlTitleClipping.Top != ty)
+                    pnlTitleClipping.Location = new Point(tx, ty);
+                if (btnDocs.Left != dx) btnDocs.Left = dx;
+                if (btnUninstall.Left != ux) btnUninstall.Left = ux;
+                if (btnInstall.Left != ix) btnInstall.Left = ix;
+            }, () =>
+            {
+                if (this.IsDisposed) return;
+                panelHeader.Height = targetHeaderHeight;
+                this.ClientSize = new Size(this.ClientSize.Width, targetClientHeight);
+                pnlTitleClipping.Location = targetTitle;
+                btnDocs.Left = targetDocsX;
+                btnUninstall.Left = targetUninstallX;
+                btnInstall.Left = targetInstallX;
+                if (hideInstallAtEnd) btnInstall.Visible = false;
+            }, Easing.EaseOutCubic);
         }
 
         /// <summary>
@@ -1001,23 +1242,60 @@ namespace CodeWalker.OIVInstaller
 
         private void ShowMainView()
         {
+            // Drop the loaded package and roll the form back to its empty-state landing.
+            // After a Done click the user's natural next action is "install another mod"
+            // or "close the app" — both are served by a clean slate. Keeping the picked
+            // package visible would also make the now-enabled Install button ambiguous
+            // (already installed? install again?).
+            _package?.Dispose();
+            _package = null;
+            txtOivPath.Text = "";
+            this.Text = "CodeWalker - Package Installer";
+            if (picIcon.Image != null)
+            {
+                var old = picIcon.Image;
+                picIcon.Image = null;
+                old.Dispose();
+            }
+            lblPackageName.Text = "Select Package";
+            lblAuthor.Text = "";
+
+            // Reset theme to default (the loaded package may have themed the header).
+            Color defaultBlue = Color.FromArgb(0, 120, 215);
+            panelHeader.BackColor = defaultBlue;
+            lblPackageName.ForeColor = Color.White;
+            lblAuthor.ForeColor = Color.White;
+            lblWarning.ForeColor = Color.White;
+            linkAuthor.LinkColor = defaultBlue;
+            linkWeb.LinkColor = defaultBlue;
+            linkYoutube.LinkColor = defaultBlue;
+            btnInstall.ForeColor = Color.Black;
+            btnInstall.FlatAppearance.BorderColor = Color.FromArgb(180, 180, 180);
+            SyncMarqueeFromLabel();
+
+            // Crossfade panelContent: hide log + loaded sections, reveal empty-state card.
+            // panelPaths is restored to its empty-state Y and made visible again — it
+            // was hidden by ShowInstallLog when the install began.
             ViewTransitions.CrossFade(panelContent, () =>
             {
                 panelLog.Visible = false;
-
+                panelPaths.Top = 160;
                 panelPaths.Visible = true;
-                panelInfo.Visible = true;
-                panelAdditional.Visible = true;
-                rtbDescription.Visible = true;
+                panelEmptyState.Visible = true;
+                rtbDescription.Visible = false;
+                panelInfo.Visible = false;
+                panelAdditional.Visible = false;
+                picIcon.Visible = false;
+                lblAuthor.Visible = false;
+                linkInstructions.Visible = false;
             });
 
-            // Re-enable main buttons. ShowInstallLog forced btnUninstall.Enabled=false during
-            // the install — restore the default enabled state here so ValidateGameFolder's
-            // early-return paths (empty _gameFolder, FiveM package) don't leave the button
-            // stuck disabled. ValidateGameFolder will demote it again if the folder is invalid.
-            btnInstall.Enabled = true;
+            // Run the inverse header/form animation in lockstep with the crossfade.
+            AnimateLayoutTransitionToEmpty(durationMs: 280);
+
+            // Install is disabled in the empty state until a package is picked again.
+            btnInstall.Enabled = false;
             btnUninstall.Enabled = true;
-            UpdateInstallButton();
             ValidateGameFolder();
         }
         

@@ -56,6 +56,11 @@ namespace CodeWalker.OIVInstaller
             this.progressBar = new CodeWalker.OIVInstaller.SmoothProgressBar();
             this.rtbLog = new System.Windows.Forms.RichTextBox();
             this.btnDone = new System.Windows.Forms.Button();
+            this.panelEmptyState = new System.Windows.Forms.Panel();
+            this.lblEmptyIcon = new System.Windows.Forms.Label();
+            this.lblEmptyTitle = new System.Windows.Forms.Label();
+            this.lblEmptySubtitle = new System.Windows.Forms.Label();
+            this.linkInstructions = new System.Windows.Forms.LinkLabel();
             this.panelHeader.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.picIcon)).BeginInit();
             this.panelContent.SuspendLayout();
@@ -63,6 +68,7 @@ namespace CodeWalker.OIVInstaller
             this.panelPaths.SuspendLayout();
             this.panelInfo.SuspendLayout();
             this.panelAdditional.SuspendLayout();
+            this.panelEmptyState.SuspendLayout();
             this.SuspendLayout();
             // 
             // panelHeader
@@ -80,7 +86,7 @@ namespace CodeWalker.OIVInstaller
             this.panelHeader.Dock = System.Windows.Forms.DockStyle.Top;
             this.panelHeader.Location = new System.Drawing.Point(0, 0);
             this.panelHeader.Name = "panelHeader";
-            this.panelHeader.Size = new System.Drawing.Size(700, 100);
+            this.panelHeader.Size = new System.Drawing.Size(700, 70);
             this.panelHeader.TabIndex = 0;
             // 
             // btnInstall
@@ -98,6 +104,7 @@ namespace CodeWalker.OIVInstaller
             this.btnInstall.UseVisualStyleBackColor = false;
             this.btnInstall.Cursor = System.Windows.Forms.Cursors.Hand;
             this.btnInstall.Enabled = false;
+            this.btnInstall.Visible = false;
             this.btnInstall.Click += new System.EventHandler(this.btnInstall_Click);
             // 
             // btnUninstall
@@ -108,7 +115,7 @@ namespace CodeWalker.OIVInstaller
             this.btnUninstall.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(180)))), ((int)(((byte)(180)))));
             this.btnUninstall.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.btnUninstall.ForeColor = System.Drawing.Color.Black;
-            this.btnUninstall.Location = new System.Drawing.Point(450, 20);
+            this.btnUninstall.Location = new System.Drawing.Point(580, 20);
             this.btnUninstall.Name = "btnUninstall";
             this.btnUninstall.Size = new System.Drawing.Size(100, 32);
             this.btnUninstall.TabIndex = 5;
@@ -125,7 +132,7 @@ namespace CodeWalker.OIVInstaller
             this.btnDocs.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(180)))), ((int)(((byte)(180)))));
             this.btnDocs.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
             this.btnDocs.ForeColor = System.Drawing.Color.Black;
-            this.btnDocs.Location = new System.Drawing.Point(340, 20);
+            this.btnDocs.Location = new System.Drawing.Point(470, 20);
             this.btnDocs.Name = "btnDocs";
             this.btnDocs.Size = new System.Drawing.Size(100, 32);
             this.btnDocs.TabIndex = 6;
@@ -158,14 +165,15 @@ namespace CodeWalker.OIVInstaller
             this.lblAuthor.TabIndex = 2;
             this.lblAuthor.Text = "";
             this.lblAuthor.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.lblAuthor.Visible = false;
             this.lblAuthor.Click += new System.EventHandler(this.lblAuthor_Click);
             // 
             // 
             // pnlTitleClipping
-            // 
+            //
             this.pnlTitleClipping.Controls.Add(this.lblPackageName);
             this.pnlTitleClipping.BackColor = System.Drawing.Color.Transparent;
-            this.pnlTitleClipping.Location = new System.Drawing.Point(93, 15);
+            this.pnlTitleClipping.Location = new System.Drawing.Point(24, 18);
             this.pnlTitleClipping.Name = "pnlTitleClipping";
             this.pnlTitleClipping.Size = new System.Drawing.Size(235, 35);
             this.pnlTitleClipping.TabIndex = 1;
@@ -195,6 +203,7 @@ namespace CodeWalker.OIVInstaller
             this.picIcon.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
             this.picIcon.TabIndex = 0;
             this.picIcon.TabStop = false;
+            this.picIcon.Visible = false;
             //
             // panelLog
             //
@@ -252,12 +261,14 @@ namespace CodeWalker.OIVInstaller
             this.panelContent.Controls.Add(this.panelAdditional);
             this.panelContent.Controls.Add(this.panelInfo);
             this.panelContent.Controls.Add(this.panelPaths);
+            this.panelContent.Controls.Add(this.linkInstructions);
             this.panelContent.Controls.Add(this.rtbDescription);
+            this.panelContent.Controls.Add(this.panelEmptyState);
             this.panelContent.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelContent.Location = new System.Drawing.Point(0, 100);
+            this.panelContent.Location = new System.Drawing.Point(0, 70);
             this.panelContent.Name = "panelContent";
             this.panelContent.Padding = new System.Windows.Forms.Padding(20, 15, 20, 15);
-            this.panelContent.Size = new System.Drawing.Size(700, 360);
+            this.panelContent.Size = new System.Drawing.Size(700, 310);
             this.panelContent.TabIndex = 1;
             // 
             // rtbDescription
@@ -274,6 +285,7 @@ namespace CodeWalker.OIVInstaller
             this.rtbDescription.Size = new System.Drawing.Size(660, 100);
             this.rtbDescription.TabIndex = 0;
             this.rtbDescription.Text = "";
+            this.rtbDescription.Visible = false;
             // 
             // panelPaths
             // 
@@ -287,7 +299,7 @@ namespace CodeWalker.OIVInstaller
             this.panelPaths.Controls.Add(this.btnBrowseOiv);
             this.panelPaths.Controls.Add(this.txtOivPath);
             this.panelPaths.Controls.Add(this.lblOivLabel);
-            this.panelPaths.Location = new System.Drawing.Point(20, 55);
+            this.panelPaths.Location = new System.Drawing.Point(20, 160);
             this.panelPaths.Name = "panelPaths";
             this.panelPaths.Size = new System.Drawing.Size(660, 125);
             this.panelPaths.TabIndex = 1;
@@ -408,6 +420,7 @@ namespace CodeWalker.OIVInstaller
             this.panelInfo.Name = "panelInfo";
             this.panelInfo.Size = new System.Drawing.Size(300, 130);
             this.panelInfo.TabIndex = 2;
+            this.panelInfo.Visible = false;
             // 
             // lblInfoTitle
             // 
@@ -497,6 +510,7 @@ namespace CodeWalker.OIVInstaller
             this.panelAdditional.Name = "panelAdditional";
             this.panelAdditional.Size = new System.Drawing.Size(300, 130);
             this.panelAdditional.TabIndex = 3;
+            this.panelAdditional.Visible = false;
             // 
             // lblAdditionalTitle
             // 
@@ -536,18 +550,78 @@ namespace CodeWalker.OIVInstaller
             this.linkYoutube.Text = "YouTube";
             this.linkYoutube.Visible = false;
             this.linkYoutube.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel_LinkClicked);
-            // 
+            //
+            // panelEmptyState
+            //
+            this.panelEmptyState.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) | System.Windows.Forms.AnchorStyles.Right)));
+            this.panelEmptyState.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(251)))), ((int)(((byte)(253)))));
+            this.panelEmptyState.Controls.Add(this.lblEmptyIcon);
+            this.panelEmptyState.Controls.Add(this.lblEmptyTitle);
+            this.panelEmptyState.Controls.Add(this.lblEmptySubtitle);
+            this.panelEmptyState.Location = new System.Drawing.Point(20, 15);
+            this.panelEmptyState.Name = "panelEmptyState";
+            this.panelEmptyState.Size = new System.Drawing.Size(660, 130);
+            this.panelEmptyState.TabIndex = 11;
+            //
+            // lblEmptyIcon
+            //
+            this.lblEmptyIcon.AutoSize = true;
+            this.lblEmptyIcon.BackColor = System.Drawing.Color.Transparent;
+            this.lblEmptyIcon.Font = new System.Drawing.Font("Segoe MDL2 Assets", 28F);
+            this.lblEmptyIcon.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(150)))), ((int)(((byte)(160)))), ((int)(((byte)(175)))));
+            this.lblEmptyIcon.Location = new System.Drawing.Point(0, 0);
+            this.lblEmptyIcon.Name = "lblEmptyIcon";
+            this.lblEmptyIcon.Text = "";
+            this.lblEmptyIcon.TabIndex = 0;
+            //
+            // lblEmptyTitle
+            //
+            this.lblEmptyTitle.AutoSize = true;
+            this.lblEmptyTitle.BackColor = System.Drawing.Color.Transparent;
+            this.lblEmptyTitle.Font = new System.Drawing.Font("Segoe UI", 11F);
+            this.lblEmptyTitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(70)))), ((int)(((byte)(75)))), ((int)(((byte)(85)))));
+            this.lblEmptyTitle.Location = new System.Drawing.Point(0, 0);
+            this.lblEmptyTitle.Name = "lblEmptyTitle";
+            this.lblEmptyTitle.Text = "Drop an .oiv or .rpf package here";
+            this.lblEmptyTitle.TabIndex = 1;
+            //
+            // lblEmptySubtitle
+            //
+            this.lblEmptySubtitle.AutoSize = true;
+            this.lblEmptySubtitle.BackColor = System.Drawing.Color.Transparent;
+            this.lblEmptySubtitle.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.lblEmptySubtitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(130)))), ((int)(((byte)(135)))), ((int)(((byte)(145)))));
+            this.lblEmptySubtitle.Location = new System.Drawing.Point(0, 0);
+            this.lblEmptySubtitle.Name = "lblEmptySubtitle";
+            this.lblEmptySubtitle.Text = "or click Browse below to select a file";
+            this.lblEmptySubtitle.TabIndex = 2;
+            //
+            // linkInstructions
+            //
+            this.linkInstructions.AutoSize = true;
+            this.linkInstructions.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.linkInstructions.LinkColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(120)))), ((int)(((byte)(215)))));
+            this.linkInstructions.Location = new System.Drawing.Point(20, 120);
+            this.linkInstructions.Name = "linkInstructions";
+            this.linkInstructions.Size = new System.Drawing.Size(110, 15);
+            this.linkInstructions.TabIndex = 12;
+            this.linkInstructions.TabStop = true;
+            this.linkInstructions.Text = "View install steps →";
+            this.linkInstructions.Visible = false;
+            this.linkInstructions.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkInstructions_LinkClicked);
+            //
             // MainForm
-            // 
+            //
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
-            this.ClientSize = new System.Drawing.Size(700, 460);
+            this.ClientSize = new System.Drawing.Size(700, 380);
             this.Controls.Add(this.panelContent);
             this.Controls.Add(this.panelHeader);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedSingle;
-            this.MaximizeBox = false;
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
+            this.MinimumSize = new System.Drawing.Size(716, 419);
             this.Name = "MainForm";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "CodeWalker - Package Installer";
@@ -566,6 +640,8 @@ namespace CodeWalker.OIVInstaller
             this.panelAdditional.ResumeLayout(false);
             this.panelAdditional.PerformLayout();
             this.panelLog.ResumeLayout(false);
+            this.panelEmptyState.ResumeLayout(false);
+            this.panelEmptyState.PerformLayout();
             this.ResumeLayout(false);
         }
 
@@ -609,5 +685,10 @@ namespace CodeWalker.OIVInstaller
         private CodeWalker.OIVInstaller.SmoothProgressBar progressBar;
         private System.Windows.Forms.RichTextBox rtbLog;
         private System.Windows.Forms.Button btnDone;
+        private System.Windows.Forms.Panel panelEmptyState;
+        private System.Windows.Forms.Label lblEmptyIcon;
+        private System.Windows.Forms.Label lblEmptyTitle;
+        private System.Windows.Forms.Label lblEmptySubtitle;
+        private System.Windows.Forms.LinkLabel linkInstructions;
     }
 }

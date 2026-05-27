@@ -84,30 +84,56 @@ namespace CodeWalker.OIVInstaller
 ==========================
 
 1. Installation
-   - Drag and drop an .OIV file onto the window, or use the 'Browse OIV' button.
-   - Select your GTA V game folder request.
+   - The window opens on an empty landing card. Drag any .oiv or .rpf onto it,
+     or click 'Browse...' next to OIV Package to pick one.
+   - The card disappears and the package's description, info, and an Install
+     button slide in. The window grows to fit the content.
+   - Select your GTA V game folder (auto-validated for Legacy / Enhanced).
    - Click 'Install'.
    - FiveM Support: Drag and drop a .RPF file to automatically install it to your FiveM mods folder.
      (Automatically detects path via Registry or %LocalAppData%).
 
-2. Uninstalling & Conflicts
+2. Previewing What an OIV Will Do
+   - After picking a package, a 'View install steps →' link appears below the
+     description.
+   - Click it to open a read-only inspector showing every operation the OIV
+     declares: archive edits, file adds / deletes, text-file inserts / replaces,
+     XML / PSO add / replace / remove, defragmentation.
+   - The tree on the left lists each operation; selecting a node shows the
+     full details (source paths, XPath expressions, full content) on the right.
+   - Useful for sanity-checking a package's scope before installing it.
+
+3. After Install
+   - Click 'Done' on the install log to return to the empty landing card,
+     ready for the next package.
+   - The previous .oiv is dropped automatically so the Install button can't
+     fire twice against the same package.
+
+4. Uninstalling & Conflicts
    - If you try to install a package that is already installed, the installer will detect the conflict.
    - You can choose to:
-     A) Uninstall & Revert to Backup: 
+     A) Uninstall & Revert to Backup:
         - Smart Revert: Attempts to undo specific text/XML changes, preserving other mods' edits.
         - Full Backup: Restores exact file backup if smart revert is not applicable.
      B) Uninstall & Reset to Vanilla: Wipes the files and replaces them with original game versions.
      C) Keep Existing: Installs the new mod on top of the old one (Stacking).
 
-3. Managing Mods
-   - Use the 'Manage Mods' button (if available) to see a list of installed packages.
+5. Skip Backup (Optional)
+   - The 'Skip backup' checkbox at the bottom-right of the paths panel will
+     install the package without recording any backup data.
+   - Trade-off: the install is faster and uses no disk space for backups,
+     but the package will NOT show up in Manage Mods and cannot be reverted
+     through this tool. Use only when you don't intend to uninstall later.
+
+6. Managing Mods
+   - Use the 'Manage Mods' button to see a list of installed packages.
    - You can uninstall packages individually from there.
 
-4. Backups
+7. Backups
    - Backups are stored in your game folder under 'OIV_Uninstall_Data'.
    - Do not verify/repair via Steam/Epic/Launcher while mods are installed if you plan to uninstall them via this tool, as it might desync the backup state.
 
-5. Supported Features (OpenIV 2.2 Format)
+8. Supported Features (OpenIV 2.2 Format)
    - Full metadata support (name, version, author, description, colors).
    - XML editing with XPath (add, replace, remove operations).
    - Text file editing (insert, replace, delete operations).
@@ -116,7 +142,7 @@ namespace CodeWalker.OIVInstaller
    - Supports GTA V Legacy & Enhanced (Gen9) Versions.
    - <gameversion> validation (Warns if package requires Enhanced/Legacy mismatch).
 
-6. Command Line Interface (CLI)
+9. Command Line Interface (CLI)
    - The installer supports full automation via command line.
    - Usage: CodeWalker.OIVInstaller.exe [options]
    - Options:
@@ -150,10 +176,16 @@ COMPLETED FEATURES:
 [x] XML append positions (First, Last, Before, After)
 [x] Path normalization fixes (mods\mods duplication bug)
 [x] Parent chain header refresh for deeply nested RPFs
-[x] Parent chain header refresh for deeply nested RPFs
 [x] Smart Text/XML Revert on uninstall (reverses specific additions/edits instead of full file revert)
 [x] FiveM RPF Support (Install/Uninstall/CLI)
 [x] Recursive Batch Script Generation
+[x] Skip-Backup option (faster, non-revertable install path)
+[x] Empty-state landing card with drag-and-drop affordance
+[x] Animated empty <-> loaded transition (header / button slide / form resize)
+[x] Resizable window with reactive title-clip + button anchoring
+[x] Install Steps preview window (assembly.xml operations tree)
+[x] Auto-return to empty state after a successful install
+[x] Theme support from OIV header background (panel color + accent on links/Install)
 
 KNOWN LIMITATIONS:
 - OpenIV may report validation errors on RPFs with 2+ levels of nesting,
@@ -166,7 +198,8 @@ REMAINING TODO:
 
 2. UI Improvements
    [ ] Display extended metadata (License, Social Media links) in the main window.
-   [ ] Improved theme support based on OIV package colors (Use package metadata for backgrounds/accents).
+   [ ] Smooth color tween for header theme on loaded <-> empty transition
+       (currently snaps to default blue).
 
 3. Core Features
    [ ] Add full transaction support for safer installations (rollback on crash).
