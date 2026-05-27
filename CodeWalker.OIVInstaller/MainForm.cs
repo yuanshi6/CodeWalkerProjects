@@ -12,6 +12,11 @@ namespace CodeWalker.OIVInstaller
     public partial class MainForm : Form
     {
         private OivPackage _package;
+        // Add-on install state — when these are set, _package is a synthetic
+        // OivPackage built just for display and the install path routes through
+        // AddonManager instead of OivInstaller.
+        private string _addonSourcePath;
+        private string _addonName;
         private string _gameFolder = ""; // Current install target
         private string _spGameFolder = ""; // Actual GTA V folder
         private string _gameFolderLegacy = "";
@@ -278,9 +283,7 @@ namespace CodeWalker.OIVInstaller
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
             {
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files.Length > 0 && 
-                   (files[0].EndsWith(".oiv", StringComparison.OrdinalIgnoreCase) || 
-                    files[0].EndsWith(".rpf", StringComparison.OrdinalIgnoreCase)))
+                if (files.Length == 1 && IsAcceptableDrop(files[0]))
                 {
                     e.Effect = DragDropEffects.Copy;
                     return;
@@ -289,21 +292,62 @@ namespace CodeWalker.OIVInstaller
             e.Effect = DragDropEffects.None;
         }
 
+        // Accept four kinds of drops:
+        //   .oiv file                          → OIV package install
+        //   .rpf file (not named "dlc.rpf")    → OIV-as-RPF package install
+        //   dlc.rpf file                       → add-on install (prompt for name)
+        //   folder containing dlc.rpf          → add-on install (folder name as add-on name)
+        private static bool IsAcceptableDrop(string path)
+        {
+            if (Directory.Exists(path))
+                return File.Exists(Path.Combine(path, "dlc.rpf"));
+            if (!File.Exists(path)) return false;
+            if (path.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase)) return true;
+            if (path.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
         private void MainForm_DragDrop(object sender, DragEventArgs e)
         {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
+            string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+            if (files.Length != 1) return;
+            string path = files[0];
+
+            if (Directory.Exists(path))
             {
-                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-                if (files.Length > 0)
+                // Folder must contain dlc.rpf — IsAcceptableDrop already validated.
+                string addonName = new DirectoryInfo(path).Name;
+                if (!AddonManager.IsValidAddonName(addonName, out string err))
                 {
-                    string file = files[0];
-                    if (file.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase) || 
-                        file.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase))
+                    MessageBox.Show(
+                        $"Folder name '{addonName}' isn't a valid add-on name:\n\n{err}\n\nRename the folder and try again.",
+                        "Invalid add-on name", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                LoadAddon(path, addonName);
+                return;
+            }
+
+            if (Path.GetFileName(path).Equals("dlc.rpf", StringComparison.OrdinalIgnoreCase))
+            {
+                // Bare dlc.rpf — prompt for the destination folder name.
+                string suggested = Path.GetFileName(Path.GetDirectoryName(path)) ?? "";
+                using (var dlg = new AddonNameDialog(suggested))
+                {
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
                     {
-                        txtOivPath.Text = file;
-                        LoadOivPackage(file);
+                        LoadAddon(path, dlg.AddonName);
                     }
                 }
+                return;
+            }
+
+            if (path.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase)
+                || path.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase))
+            {
+                txtOivPath.Text = path;
+                LoadOivPackage(path);
             }
         }
         
@@ -596,6 +640,47 @@ namespace CodeWalker.OIVInstaller
             {
                 btnUninstall.Enabled = hasLegacy || hasEnhanced;
             }
+        }
+
+        /// <summary>
+        /// Sets up the main view to display a *DLC add-on* drop — a folder containing
+        /// dlc.rpf, or a bare dlc.rpf that the user has just named. Construct a minimal
+        /// stand-in <see cref="OivPackage"/> so the existing loaded-state layout
+        /// (description, info, header) renders, then override the package-specific
+        /// labels so the user understands this is an add-on, not an OIV install.
+        /// </summary>
+        private void LoadAddon(string sourcePath, string addonName)
+        {
+            _package?.Dispose();
+            _package = null;
+
+            _addonSourcePath = sourcePath;
+            _addonName = addonName;
+
+            var pkg = new OivPackage();
+            pkg.Metadata.Name = addonName;
+            pkg.Metadata.Description =
+                "DLC add-on package." + Environment.NewLine + Environment.NewLine +
+                "Destination:" + Environment.NewLine +
+                $"  mods\\update\\x64\\dlcpacks\\{addonName}\\" + Environment.NewLine + Environment.NewLine +
+                "Will be enabled in dlclist.xml inside update.rpf on install.";
+            _package = pkg;
+
+            txtOivPath.Text = sourcePath;
+            DisplayPackageInfo();
+
+            // Override package-specific labels for add-on mode. The Info / Additional
+            // panels still appear (kept the same layout) but with add-on phrasing.
+            linkAuthor.Text = "";
+            linkAuthor.Tag = null;
+            lblGame.Text = "DLC Add-on";
+            lblGame.ForeColor = Color.FromArgb(180, 100, 30);
+            lblVersion.Text = "—";
+
+            // No assembly.xml to preview — hide the "View install steps" link.
+            linkInstructions.Visible = false;
+
+            UpdateInstallButton();
         }
 
         private void LoadOivPackage(string path)
@@ -1056,6 +1141,15 @@ namespace CodeWalker.OIVInstaller
                 if (result == DialogResult.Cancel) return;
             }
 
+            // Add-on install path: copy folder/dlc.rpf into mods\update\x64\dlcpacks\<name>\
+            // and enable it in dlclist.xml. No BackupSession is recorded, so the add-on
+            // never appears in Manage Mods → Installed Packages.
+            if (_addonName != null)
+            {
+                InstallAddonPath();
+                return;
+            }
+
             if (_package.IsFiveM)
             {
                 // FiveM Installation Logic
@@ -1240,7 +1334,78 @@ namespace CodeWalker.OIVInstaller
                 }
             });
         }
-        
+
+        // Drives the add-on install: optional overwrite confirmation, then runs the
+        // copy + dlclist enable on a background thread, writing to the install log
+        // exactly like the package path so the UX matches.
+        private void InstallAddonPath()
+        {
+            var manager = new AddonManager(_gameFolder);
+            if (!manager.ModsFolderExists)
+            {
+                MessageBox.Show(
+                    "mods\\update\\update.rpf was not found in this game folder.\n\n" +
+                    "Set up your mods folder (with OpenIV / RageOpenV) before installing add-ons.",
+                    "Mods folder missing", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            bool overwrite = false;
+            if (manager.AddonFolderExists(_addonName))
+            {
+                var r = MessageBox.Show(
+                    $"An add-on folder named '{_addonName}' already exists at:\n\n" +
+                    $"mods\\update\\x64\\dlcpacks\\{_addonName}\\\n\n" +
+                    "Overwrite it with the dropped content?",
+                    "Confirm overwrite",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question,
+                    MessageBoxDefaultButton.Button2);
+                if (r != DialogResult.Yes) return;
+                overwrite = true;
+            }
+
+            ShowInstallLog();
+
+            string source = _addonSourcePath;
+            string name = _addonName;
+
+            Task.Run(() =>
+            {
+                try
+                {
+                    Log("Initializing add-on installation...");
+                    Log($"Source     : {source}");
+                    Log($"Destination: mods\\update\\x64\\dlcpacks\\{name}\\");
+                    if (overwrite) Log("Existing folder will be replaced.");
+                    Log("");
+
+                    var progress = new Progress<string>(msg => Log(msg));
+                    manager.InstallAddon(source, name, overwrite, progress);
+
+                    Log("");
+                    Log("Add-on installation completed successfully.");
+                    Log("dlclist.xml updated inside mods\\update\\update.rpf.");
+                    Log("----------------------------------------");
+                }
+                catch (Exception ex)
+                {
+                    Log("");
+                    Log("ERROR: Add-on installation failed!");
+                    Log(ex.Message);
+                    if (ex.StackTrace != null) Log(ex.StackTrace);
+                }
+                finally
+                {
+                    this.Invoke((MethodInvoker)delegate
+                    {
+                        btnDone.Enabled = true;
+                        btnDone.Visible = true;
+                    });
+                }
+            });
+        }
+
         private void btnDone_Click(object sender, EventArgs e)
         {
             ShowMainView();
@@ -1280,6 +1445,10 @@ namespace CodeWalker.OIVInstaller
             // (already installed? install again?).
             _package?.Dispose();
             _package = null;
+            // Clear add-on mode if we came from a folder/dlc.rpf drop so the next
+            // drop starts fresh (and Install routes through the package path again).
+            _addonName = null;
+            _addonSourcePath = null;
             txtOivPath.Text = "";
             this.Text = "CodeWalker - Package Installer";
             if (picIcon.Image != null)

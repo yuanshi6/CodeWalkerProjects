@@ -126,14 +126,46 @@ namespace CodeWalker.OIVInstaller
      through this tool. Use only when you don't intend to uninstall later.
 
 6. Managing Mods
-   - Use the 'Manage Mods' button to see a list of installed packages.
-   - You can uninstall packages individually from there.
+   - The 'Manage Mods' button opens a window with two tabs:
 
-7. Backups
+     a) Installed Packages
+        - Lists every OIV / FiveM .rpf installed through this tool.
+        - Select a row and click 'Uninstall' to revert.
+        - Skip-Backup installs do NOT appear here (they have no backup data).
+
+     b) DLC Add-ons
+        - Lists every folder under mods\update\x64\dlcpacks\ together with
+          every entry already declared in dlclist.xml.
+        - Each user add-on has a checkbox; tick to enable, untick to disable.
+          Disabling is non-destructive — only the dlclist entry is removed,
+          the folder stays in place so re-enabling is one click.
+        - Vanilla Rockstar DLCs (mpheist, mp2025_*, patchday*, etc.) appear
+          on a pale grey row with italic text and a 'Vanilla DLC' status —
+          read-only, so a stray click can't disable a stock pack.
+        - Orphans (entries in dlclist with no matching folder) are flagged
+          'Orphan' and also read-only. Usually a leftover from manually
+          deleting an add-on folder.
+
+7. Installing DLC Add-ons
+   - Drag a folder containing dlc.rpf onto the window:
+       The folder name becomes the add-on name automatically.
+   - Or drag a bare dlc.rpf file:
+       A small dialog asks you to type a destination folder name. The name
+       is validated (no path separators, not a Rockstar stock name).
+   - Click Install:
+       The folder/file is copied to mods\update\x64\dlcpacks\<name>\ and
+       a matching <Item>dlcpacks:/<name>/</Item> is added to dlclist.xml
+       inside mods\update\update.rpf.
+   - Conflict: if dlcpacks\<name>\ already exists you are asked to confirm
+     before overwriting.
+   - Add-ons installed this way do NOT show in 'Installed Packages' — they
+     are managed entirely through the DLC Add-ons tab.
+
+8. Backups
    - Backups are stored in your game folder under 'OIV_Uninstall_Data'.
    - Do not verify/repair via Steam/Epic/Launcher while mods are installed if you plan to uninstall them via this tool, as it might desync the backup state.
 
-8. Supported Features (OpenIV 2.2 Format)
+9. Supported Features (OpenIV 2.2 Format)
    - Full metadata support (name, version, author, description, colors).
    - XML editing with XPath (add, replace, remove operations).
    - Text file editing (insert, replace, delete operations).
@@ -142,7 +174,7 @@ namespace CodeWalker.OIVInstaller
    - Supports GTA V Legacy & Enhanced (Gen9) Versions.
    - <gameversion> validation (Warns if package requires Enhanced/Legacy mismatch).
 
-9. Command Line Interface (CLI)
+10. Command Line Interface (CLI)
    - The installer supports full automation via command line.
    - Usage: CodeWalker.OIVInstaller.exe [options]
    - Options:
@@ -186,6 +218,16 @@ COMPLETED FEATURES:
 [x] Install Steps preview window (assembly.xml operations tree)
 [x] Auto-return to empty state after a successful install
 [x] Theme support from OIV header background (panel color + accent on links/Install)
+[x] Idle R→G→B header pulse while no package is loaded
+[x] DLC Add-on management (Manage Mods → DLC Add-ons tab):
+    - enable/disable user add-ons by toggling their dlclist.xml entry
+    - vanilla Rockstar DLCs rendered as read-only ""Vanilla DLC"" rows
+    - orphan dlclist entries flagged separately
+[x] DLC Add-on installation by drag-and-drop:
+    - drop a folder containing dlc.rpf  → installs as <foldername>
+    - drop a bare dlc.rpf file          → prompts for an add-on name
+    - confirms overwrite if dlcpacks\<name>\ already exists
+[x] Retry-with-backoff on update.rpf I/O lock (antivirus / search indexer)
 
 KNOWN LIMITATIONS:
 - OpenIV may report validation errors on RPFs with 2+ levels of nesting,
