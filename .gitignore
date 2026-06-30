@@ -1,6 +1,4 @@
 # Build artifacts
-CoreFX_Legacy_FiveM/
-CoreFX_Enhanced_Singleplayer/
 *.rpf
 *.dll
 *.exe
@@ -9,3 +7,10 @@ CoreFX_Enhanced_Singleplayer/
 bin/
 obj/
 .vs/
+
+# Package content & build assets
+CodeWalker.OIVInstaller/Mod example/
+CodeWalker.OIVInstaller/packaging/
+CodeWalker.OivsPacker/dist/
+*.oivs
+*.oivsproj

@@ -17,6 +17,13 @@ namespace CodeWalker.OIVInstaller
         // AddonManager instead of OivInstaller.
         private string _addonSourcePath;
         private string _addonName;
+        // Super OIV (.oivs) state — when set, _package is a synthetic display
+        // package and the install path opens the selection wizard, then builds the
+        // chosen modules/options into _package before running OivInstaller.
+        private OivsPackage _oivsPackage;
+        // Set by Program when launched with --manage (Uninstall.bat): after the
+        // window shows (and any package/config has loaded) open Manage Mods.
+        public bool OpenManageOnShown;
         private string _gameFolder = ""; // Current install target
         private string _spGameFolder = ""; // Actual GTA V folder
         private string _gameFolderLegacy = "";
@@ -215,15 +222,45 @@ namespace CodeWalker.OIVInstaller
             _headerPulser.CycleMs = 12000;
             _headerPulser.Start();
 
-            // Check command line args for OIV file
+            // Load the saved game folder FIRST, so that a package opened from the
+            // command line (Install.bat) sees a valid _gameFolder and enables the
+            // Install button. (UpdateInstallButton requires both a package and a
+            // game folder; loading the package before the config left it disabled.)
+            LoadConfig();
+
+            // Check command line args for a package file. Scan all args (not just
+            // args[1]) so the package path can appear in any position relative to
+            // flags like --manage.
             var args = Environment.GetCommandLineArgs();
-            if (args.Length > 1 && File.Exists(args[1]) && (args[1].EndsWith(".oiv", StringComparison.OrdinalIgnoreCase) || args[1].EndsWith(".rpf", StringComparison.OrdinalIgnoreCase)))
+            for (int i = 1; i < args.Length; i++)
             {
-                txtOivPath.Text = args[1];
-                LoadOivPackage(args[1]);
+                string a = args[i];
+                if (!File.Exists(a)) continue;
+                if (a.EndsWith(".oivs", StringComparison.OrdinalIgnoreCase))
+                {
+                    txtOivPath.Text = a;
+                    LoadOivsPackage(a);
+                    break;
+                }
+                if (a.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase) || a.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase))
+                {
+                    txtOivPath.Text = a;
+                    LoadOivPackage(a);
+                    break;
+                }
             }
 
-            LoadConfig();
+            // Final safety: reflect the resolved package + game-folder state.
+            UpdateInstallButton();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            // Release extracted package temp folders (.oivs/.oiv unpack to %TEMP% on
+            // load — ~1 GB+ for large packs). Without this they accumulate until reboot.
+            try { _package?.Dispose(); } catch { }
+            try { _oivsPackage?.Dispose(); } catch { }
+            base.OnFormClosed(e);
         }
 
         protected override void OnShown(EventArgs e)
@@ -241,6 +278,14 @@ namespace CodeWalker.OIVInstaller
             {
                 if (!this.IsDisposed) this.Opacity = 1.0;
             }, Easing.EaseOutCubic);
+
+            // Uninstall.bat launches with --manage: jump straight to Manage Mods
+            // once the window (and any loaded package/config) has settled.
+            if (OpenManageOnShown)
+            {
+                OpenManageOnShown = false;
+                BeginInvoke((MethodInvoker)(() => btnUninstall_Click(this, EventArgs.Empty)));
+            }
         }
 
         /// <summary>
@@ -303,6 +348,7 @@ namespace CodeWalker.OIVInstaller
                 return File.Exists(Path.Combine(path, "dlc.rpf"));
             if (!File.Exists(path)) return false;
             if (path.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase)) return true;
+            if (path.EndsWith(".oivs", StringComparison.OrdinalIgnoreCase)) return true;
             if (path.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase)) return true;
             return false;
         }
@@ -343,6 +389,13 @@ namespace CodeWalker.OIVInstaller
                 return;
             }
 
+            if (path.EndsWith(".oivs", StringComparison.OrdinalIgnoreCase))
+            {
+                txtOivPath.Text = path;
+                LoadOivsPackage(path);
+                return;
+            }
+
             if (path.EndsWith(".oiv", StringComparison.OrdinalIgnoreCase)
                 || path.EndsWith(".rpf", StringComparison.OrdinalIgnoreCase))
             {
@@ -355,13 +408,16 @@ namespace CodeWalker.OIVInstaller
         {
             using (var dlg = new OpenFileDialog())
             {
-                dlg.Title = "Select OIV or RPF Package";
-                dlg.Filter = "OIV/RPF Packages (*.oiv;*.rpf)|*.oiv;*.rpf|All Files (*.*)|*.*";
-                
+                dlg.Title = "Select OIV / Super OIV / RPF Package";
+                dlg.Filter = "All Packages (*.oiv;*.oivs;*.rpf)|*.oiv;*.oivs;*.rpf|Super OIV (*.oivs)|*.oivs|OIV/RPF (*.oiv;*.rpf)|*.oiv;*.rpf|All Files (*.*)|*.*";
+
                 if (dlg.ShowDialog() == DialogResult.OK)
                 {
                     txtOivPath.Text = dlg.FileName;
-                    LoadOivPackage(dlg.FileName);
+                    if (dlg.FileName.EndsWith(".oivs", StringComparison.OrdinalIgnoreCase))
+                        LoadOivsPackage(dlg.FileName);
+                    else
+                        LoadOivPackage(dlg.FileName);
                 }
             }
         }
@@ -653,6 +709,8 @@ namespace CodeWalker.OIVInstaller
         {
             _package?.Dispose();
             _package = null;
+            _oivsPackage?.Dispose();
+            _oivsPackage = null;
 
             _addonSourcePath = sourcePath;
             _addonName = addonName;
@@ -683,6 +741,39 @@ namespace CodeWalker.OIVInstaller
             UpdateInstallButton();
         }
 
+        // Loads a Super OIV (.oivs): builds a synthetic display package so the
+        // existing header/description/theming renders unchanged, while _oivsPackage
+        // holds the real manifest for the selection wizard at install time.
+        private void LoadOivsPackage(string path)
+        {
+            try
+            {
+                _package?.Dispose();
+                _package = null;
+                _oivsPackage?.Dispose();
+                _oivsPackage = null;
+                _addonName = null;
+                _addonSourcePath = null;
+
+                _oivsPackage = OivsPackage.Load(path);
+                _package = OivPackage.CreateSynthetic(
+                    _oivsPackage.Metadata, _oivsPackage.ContentPath, new List<OivOperation>(),
+                    _oivsPackage.IconData);
+
+                DisplayPackageInfo();
+
+                // The wizard is the install-steps preview for .oivs packages.
+                linkInstructions.Visible = false;
+
+                UpdateInstallButton();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to load Super OIV package:\n\n{ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void LoadOivPackage(string path)
         {
             try
@@ -690,7 +781,9 @@ namespace CodeWalker.OIVInstaller
                 // Dispose previous package
                 _package?.Dispose();
                 _package = null;
-                
+                _oivsPackage?.Dispose();
+                _oivsPackage = null;
+
                 // Check if it's a folder (extracted OIV for testing)
                 if (Directory.Exists(path))
                 {
@@ -1139,6 +1232,27 @@ namespace CodeWalker.OIVInstaller
                     MessageBoxIcon.Warning);
 
                 if (result == DialogResult.Cancel) return;
+            }
+
+            // Super OIV path: open the selection wizard, then build the chosen
+            // modules/options into _package and fall through to the standard
+            // single-player install flow (existing-package prompt + OivInstaller).
+            if (_oivsPackage != null)
+            {
+                using (var wizard = new OivsSelectionForm(_oivsPackage))
+                {
+                    if (wizard.ShowDialog(this) != DialogResult.OK) return;
+
+                    var ops = _oivsPackage.BuildOperations(wizard.Selection);
+                    if (ops.Count == 0)
+                    {
+                        MessageBox.Show("No components were selected to install.",
+                            "Nothing to install", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+                    _package = OivPackage.CreateSynthetic(
+                        _oivsPackage.Metadata, _oivsPackage.ContentPath, ops);
+                }
             }
 
             // Add-on install path: copy folder/dlc.rpf into mods\update\x64\dlcpacks\<name>\

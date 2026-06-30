@@ -9,6 +9,8 @@
     <ApplicationIcon>CW.ico</ApplicationIcon>
     <AssemblyName>CodeWalker.OIVInstaller</AssemblyName>
     <RootNamespace>CodeWalker.OIVInstaller</RootNamespace>
+    <!-- 'backup\' holds a stale copy of the sources; never include it in the build -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);backup\**</DefaultItemExcludes>
   </PropertyGroup>
 
   <ItemGroup>

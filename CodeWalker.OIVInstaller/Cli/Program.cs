@@ -12,8 +12,39 @@ namespace CodeWalker.OIVInstaller
         [STAThread]
         static int Main(string[] args)
         {
-            // Check for CLI mode
-            if (args.Length > 0 && IsCliArg(args[0]))
+            // GUI launch intent for the bundled Install.bat / Uninstall.bat:
+            //   exe <package>            → open the GUI with the package loaded
+            //   exe <package> --manage   → open the GUI and jump to Manage Mods
+            // The --manage flag must be detected before the CLI check so it doesn't
+            // fall into console mode (which would happen if it were args[0]).
+            bool openManage = HasFlag(args, "--manage") || HasFlag(args, "--uninstall-ui");
+
+            // --preview <pkg.oivs> : open the selection wizard read-only (used by the
+            // OIVS Packer's Preview button). Handled before the CLI check.
+            string previewPath = GetFlagValue(args, "--preview");
+            if (previewPath != null)
+            {
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.SetHighDpiMode(HighDpiMode.SystemAware);
+                try
+                {
+                    if (!File.Exists(previewPath))
+                        throw new FileNotFoundException("Package not found: " + previewPath);
+                    using var pkg = OivsPackage.Load(previewPath);
+                    using var wiz = new OivsSelectionForm(pkg, previewMode: true);
+                    Application.Run(wiz);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Couldn't preview the package:\n\n" + ex.Message, "Preview",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return 0;
+            }
+
+            // Check for CLI mode (console). Skipped when --manage requests the GUI.
+            if (!openManage && args.Length > 0 && IsCliArg(args[0]))
             {
                 return RunCli(args);
             }
@@ -22,8 +53,25 @@ namespace CodeWalker.OIVInstaller
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
             Application.SetHighDpiMode(HighDpiMode.SystemAware);
-            Application.Run(new MainForm());
+            var form = new MainForm();
+            if (openManage) form.OpenManageOnShown = true;
+            Application.Run(form);
             return 0;
+        }
+
+        private static bool HasFlag(string[] args, string flag)
+        {
+            foreach (var a in args)
+                if (a.Equals(flag, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        // Returns the argument following <flag>, or null if absent.
+        private static string GetFlagValue(string[] args, string flag)
+        {
+            for (int i = 0; i < args.Length - 1; i++)
+                if (args[i].Equals(flag, StringComparison.OrdinalIgnoreCase)) return args[i + 1];
+            return null;
         }
 
         /// <summary>
@@ -52,6 +100,7 @@ namespace CodeWalker.OIVInstaller
                 bool useVanilla = false;
                 bool force = false;
                 bool skipBackup = false;
+                string selectSpec = null;
 
                 for (int i = 0; i < args.Length; i++)
                 {
@@ -103,6 +152,26 @@ namespace CodeWalker.OIVInstaller
                             command = "list";
                             break;
 
+                        case "--list-options":
+                            command = "list-options";
+                            if (i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                            {
+                                oivPath = args[++i];
+                            }
+                            break;
+
+                        case "--select":
+                            if (i + 1 < args.Length)
+                            {
+                                selectSpec = args[++i];
+                            }
+                            else
+                            {
+                                Console.WriteLine("Error: --select requires a value (e.g. \"roads,streetlights=coffee\").");
+                                return 2;
+                            }
+                            break;
+
                         case "--game":
                             if (i + 1 < args.Length)
                             {
@@ -131,8 +200,9 @@ namespace CodeWalker.OIVInstaller
 
                         default:
                             // Unknown argument - might be a path for install?
-                            if (!arg.StartsWith("-") && File.Exists(args[i]) && 
-                                args[i].EndsWith(".oiv", StringComparison.OrdinalIgnoreCase))
+                            if (!arg.StartsWith("-") && File.Exists(args[i]) &&
+                                (args[i].EndsWith(".oiv", StringComparison.OrdinalIgnoreCase) ||
+                                 args[i].EndsWith(".oivs", StringComparison.OrdinalIgnoreCase)))
                             {
                                 oivPath = args[i];
                                 command = "install";
@@ -151,7 +221,15 @@ namespace CodeWalker.OIVInstaller
                 switch (command)
                 {
                     case "install":
+                        if (!string.IsNullOrEmpty(oivPath) &&
+                            oivPath.EndsWith(".oivs", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return CliHandler.RunInstallOivs(oivPath, gameFolder, selectSpec, force, skipBackup);
+                        }
                         return CliHandler.RunInstall(oivPath, gameFolder, force, skipBackup);
+
+                    case "list-options":
+                        return CliHandler.ListOivsOptions(oivPath);
 
                     case "uninstall":
                         return CliHandler.RunUninstall(packageName, gameFolder, useVanilla);

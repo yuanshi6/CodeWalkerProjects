@@ -35,6 +35,18 @@ namespace CodeWalker.OIVInstaller
             tabGuide.Controls.Add(rtbGuide);
             tabControl.TabPages.Add(tabGuide);
 
+            // Tab: OIVS (Super OIV) multi-component packages
+            TabPage tabOivs = new TabPage("OIVS Packages");
+            RichTextBox rtbOivs = new RichTextBox();
+            rtbOivs.Dock = DockStyle.Fill;
+            rtbOivs.ReadOnly = true;
+            rtbOivs.BackColor = Color.White;
+            rtbOivs.BorderStyle = BorderStyle.None;
+            rtbOivs.Padding = new Padding(10);
+            rtbOivs.Text = GetOivsGuideText();
+            tabOivs.Controls.Add(rtbOivs);
+            tabControl.TabPages.Add(tabOivs);
+
             // Tab 2: Todo / Roadmap
             TabPage tabTodo = new TabPage("Developer Todo");
             RichTextBox rtbTodo = new RichTextBox();
@@ -84,12 +96,14 @@ namespace CodeWalker.OIVInstaller
 ==========================
 
 1. Installation
-   - The window opens on an empty landing card. Drag any .oiv or .rpf onto it,
-     or click 'Browse...' next to OIV Package to pick one.
+   - The window opens on an empty landing card. Drag any .oiv, .oivs or .rpf
+     onto it, or click 'Browse...' next to OIV Package to pick one.
    - The card disappears and the package's description, info, and an Install
      button slide in. The window grows to fit the content.
    - Select your GTA V game folder (auto-validated for Legacy / Enhanced).
    - Click 'Install'.
+   - .oivs (Super OIV) packages let you choose which optional components to
+     install via a selection wizard - see the 'OIVS Packages' tab.
    - FiveM Support: Drag and drop a .RPF file to automatically install it to your FiveM mods folder.
      (Automatically detects path via Registry or %LocalAppData%).
 
@@ -187,7 +201,10 @@ namespace CodeWalker.OIVInstaller
    - The installer supports full automation via command line.
    - Usage: CodeWalker.OIVInstaller.exe [options]
    - Options:
-     --install <path>       Install an OIV package
+     --install <path>       Install an OIV (.oiv) or Super OIV (.oivs) package
+     --select ""<spec>""      Choose .oivs components, e.g.
+                            ""addon1,group=option,group2=none"" (with --install)
+     --list-options <path>  List the modules and option groups in a .oivs
      --uninstall <name>     Uninstall a package by name
      --uninstall-oiv <path> Uninstall by reading package name from OIV file
      --list                 List installed packages
@@ -202,6 +219,82 @@ namespace CodeWalker.OIVInstaller
      If no game folder is set, CLI commands will open a folder picker dialog.
      Example batch scripts for automation are available in the repository:
      https://github.com/crxhvrd/CodeWalkerProjects/tree/master
+";
+        }
+
+        private string GetOivsGuideText()
+        {
+            return
+@"OIVS Packages (.oivs) - Multi-Component Installer
+=================================================
+
+WHAT IS A .oivs PACKAGE?
+   A Super OIV (.oivs) bundles MORE than one mod in a single file and lets the
+   user choose what to install - like a setup wizard. One package can contain:
+
+     - An optional BASE mod          - if present, it is always installed.
+     - Optional ADD-ONS (checkboxes) - install any combination you like.
+     - Single-choice GROUPS (radios) - pick exactly one option, or None
+       (e.g. ""Headlights: Stock / Xenon / None"").
+
+   A base mod is NOT mandatory: a .oivs can also be a pure COMPILATION where
+   every component is optional and the user picks whichever ones they want
+   (install all, some, or just one).
+
+   Each module and option can carry its own description and preview images -
+   either single screenshots or before/after comparisons - shown right in the
+   installer so the user sees what they are choosing.
+
+HOW IT WORKS (vs a normal .oiv)
+   A .oivs is a ZIP holding ONE manifest (super.xml) that inlines the standard
+   OIV install operations for every component, plus a shared content/ folder
+   and a media/ folder of previews. It is NOT a container of separate .oiv
+   files - it carries all the install instructions itself and runs only the
+   SELECTED components through the same engine as a normal .oiv (RPF edits,
+   file adds/deletes, text / XML / PSO edits, loose-file copies).
+
+INSTALLING A .oivs
+   1. Drag a .oivs onto the window (or use Browse...). Its name, author and
+      description load just like an .oiv, with the package icon in the header.
+   2. Pick your game folder, then click Install.
+   3. A SELECTION WIZARD opens:
+        - If the package has a base mod it is shown checked and locked
+          (always installed); a compilation has no base, just a list to pick.
+        - Tick the modules / add-ons you want.
+        - For each single-choice group, pick one option (or None).
+        - Click any item to preview its description and screenshots on the
+          right. Click a before/after image to flip Before <-> After; use the
+          dropdown (or click the image) to step through a screenshot gallery.
+   4. Click Install in the wizard. Only the components you selected are
+      written to the game, through the normal OIV install engine.
+
+BACKUP, UNINSTALL & RECONFIGURE
+   - A .oivs install is backed up and tracked exactly like an .oiv: it appears
+     in Manage Mods under the package name and can be reverted (Revert to
+     Backup or Reset to Vanilla).
+   - Loose-file components (e.g. a folder copied into the game root) are
+     tracked too, so uninstalling removes them cleanly.
+   - The whole package is recorded as ONE entry. To CHANGE your selection,
+     uninstall and reinstall, picking different components.
+   - Re-installing the same package triggers the usual conflict prompt
+     (Revert to Backup / Reset to Vanilla / Keep on top).
+
+CREATING .oivs PACKAGES
+   - Use the OIVS Packer, a separate authoring tool. Fill in the package info,
+     add modules and single-choice groups, point each at an .oiv and/or a
+     folder, attach preview images, and Export a .oivs. No manual file editing.
+
+COMMAND LINE (automation)
+   --install <pkg.oivs> [--select ""..."" ]   Install selected components.
+   --list-options <pkg.oivs>                 List the modules and option groups.
+
+   --select takes a comma-separated list:
+       moduleId            enable an optional module
+       -moduleId           disable a default-on optional module
+       groupId=optionId    pick an option in a single-choice group
+       groupId=none        pick nothing in that group
+   Example:  --install pack.oivs --select ""extras,headlights=xenon,flares=none""
+   Omit --select to install the required base plus any default-on components.
 ";
         }
 
@@ -239,6 +332,14 @@ COMPLETED FEATURES:
     - drop a bare dlc.rpf file          → prompts for an add-on name
     - confirms overwrite if dlcpacks\<name>\ already exists
 [x] Retry-with-backoff on update.rpf I/O lock (antivirus / search indexer)
+[x] OIVS (.oivs) multi-component packages - Vortex-style installer:
+    - one package = required base + optional add-ons + single-choice groups
+    - selection wizard with checkboxes / radios and image / before-after previews
+    - bundled or URL preview media; package icon in the header
+    - selected components run through the existing OIV engine; backup &
+      uninstall via Manage Mods exactly like a normal .oiv
+    - CLI: --install pkg.oivs --select ""..."" and --list-options
+    - authored with the separate OIVS Packer tool
 
 KNOWN LIMITATIONS:
 - OpenIV may report validation errors on RPFs with 2+ levels of nesting,
@@ -259,8 +360,10 @@ REMAINING TODO:
    [ ] Validating 'Condition' attributes for file content more rigorously.
 
 4. Enhanced Installation Features
-   [ ] Implement 'Enhanced' mod installation flow (Vortex-style).
-       - Allow installing not only a single mod package but also choosing optional components.
+   [x] 'Enhanced' (Vortex-style) install flow - shipped as OIVS (.oivs) packages
+       (see Completed Features above and the 'OIVS Packages' tab).
+   [ ] Per-component uninstall / reconfigure for .oivs (currently the package
+       is tracked as one entry; changing selection means uninstall + reinstall).
    [ ] Automatic dependencies installation (OpenIV.asi / OpenRPF.asi / RageOpenV.asi, ASI Loader).
 
 ";

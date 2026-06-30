@@ -639,6 +639,207 @@ namespace CodeWalker.OIVInstaller
         }
 
         /// <summary>
+        /// Installs a Super OIV (.oivs) package: builds the operation list for the
+        /// selected modules/options and runs it through the existing OIV engine.
+        /// </summary>
+        public static int RunInstallOivs(string oivsPath, string gameFolder, string selectSpec,
+                                         bool force = false, bool skipBackup = false)
+        {
+            if (ProcessHelper.IsGameRunning(out string processName))
+            {
+                Console.WriteLine($"Error: The game process '{processName}' is currently running.");
+                Console.WriteLine("Please close the game before installing mods.");
+                return 6;
+            }
+            if (string.IsNullOrEmpty(oivsPath))
+            {
+                Console.WriteLine("Error: No .oivs package path specified.");
+                return 2;
+            }
+            if (!File.Exists(oivsPath))
+            {
+                Console.WriteLine($"Error: .oivs file not found: {oivsPath}");
+                return 3;
+            }
+
+            OivsPackage pkg = null;
+            try
+            {
+                Console.WriteLine($"Loading Super OIV package: {Path.GetFileName(oivsPath)}");
+                pkg = OivsPackage.Load(oivsPath);
+                Console.WriteLine($"Package: {pkg.Metadata.Name} v{pkg.Metadata.Version}");
+
+                // Determine/validate game folder (mirrors RunInstall)
+                if (string.IsNullOrEmpty(gameFolder))
+                {
+                    var config = OivAppConfig.Load();
+                    if (pkg.Metadata.GameVersion == GameVersion.Enhanced && !string.IsNullOrEmpty(config.GameFolderEnhanced))
+                        gameFolder = config.GameFolderEnhanced;
+                    else if (pkg.Metadata.GameVersion == GameVersion.Legacy && !string.IsNullOrEmpty(config.GameFolderLegacy))
+                        gameFolder = config.GameFolderLegacy;
+                    if (string.IsNullOrEmpty(gameFolder)) gameFolder = PromptForGameFolder();
+                    if (string.IsNullOrEmpty(gameFolder)) return 4;
+                }
+                if (!Directory.Exists(gameFolder))
+                {
+                    Console.WriteLine($"Error: Game folder not found: {gameFolder}");
+                    return 4;
+                }
+
+                // Resolve the user's selection
+                var selection = ParseSelection(pkg, selectSpec, out int selErr);
+                if (selection == null) return selErr;
+
+                // Show the install plan
+                Console.WriteLine();
+                Console.WriteLine("Install plan:");
+                foreach (var m in pkg.Modules)
+                {
+                    bool on = m.Required || selection.EnabledModules.Contains(m.Id);
+                    Console.WriteLine($"  [{(on ? "x" : " ")}] {m.Name}{(m.Required ? "  (required)" : "")}");
+                }
+                foreach (var g in pkg.Groups)
+                {
+                    selection.GroupChoices.TryGetValue(g.Id, out string choice);
+                    Console.WriteLine($"  ( ) {g.Title}: {(string.IsNullOrEmpty(choice) ? "none" : choice)}");
+                }
+                Console.WriteLine();
+
+                // Validate game version + environment
+                if (!EnsureCorrectGameFolder(pkg.Metadata, ref gameFolder, force)) return 5;
+                CheckModdingEnvironment(gameFolder);
+
+                Console.WriteLine("Initializing encryption keys...");
+                bool isGen9 = File.Exists(Path.Combine(gameFolder, "eboot.bin")) ||
+                              File.Exists(Path.Combine(gameFolder, "GTA5_Enhanced.exe"));
+                GTA5Keys.LoadFromPath(gameFolder, isGen9, null);
+
+                var operations = pkg.BuildOperations(selection);
+                if (operations.Count == 0)
+                {
+                    Console.WriteLine("Nothing selected to install.");
+                    return 0;
+                }
+
+                var synthetic = OivPackage.CreateSynthetic(pkg.Metadata, pkg.ContentPath, operations);
+                var installer = new OivInstaller(gameFolder, synthetic, msg => Console.WriteLine($"  {msg}"));
+                var progress = new Progress<InstallProgress>(p =>
+                    Console.Write($"\r[{p.Percent,3}%] {p.Status,-50}"));
+
+                Console.WriteLine("Installing...");
+                installer.Install(progress, skipBackup: skipBackup);
+                Console.WriteLine();
+                Console.WriteLine("Installation complete!");
+                return 0;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine();
+                Console.WriteLine($"Error during installation: {ex.Message}");
+                return 1;
+            }
+            finally
+            {
+                pkg?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Lists the modules and option groups available in a .oivs package.
+        /// </summary>
+        public static int ListOivsOptions(string oivsPath)
+        {
+            if (string.IsNullOrEmpty(oivsPath) || !File.Exists(oivsPath))
+            {
+                Console.WriteLine($"Error: .oivs file not found: {oivsPath}");
+                return 3;
+            }
+            using (var pkg = OivsPackage.Load(oivsPath))
+            {
+                Console.WriteLine($"{pkg.Metadata.Name} v{pkg.Metadata.Version}");
+                Console.WriteLine();
+                Console.WriteLine("Modules:");
+                foreach (var m in pkg.Modules)
+                {
+                    string tag = m.Required ? "required" : (m.Default ? "optional, default ON" : "optional");
+                    Console.WriteLine($"  {m.Id,-22} {m.Name}  [{tag}]");
+                }
+                Console.WriteLine();
+                Console.WriteLine("Groups (single-choice):");
+                foreach (var g in pkg.Groups)
+                {
+                    Console.WriteLine($"  {g.Id}  \"{g.Title}\"  (default: {g.Default})");
+                    foreach (var o in g.Options)
+                        Console.WriteLine($"      {g.Id}={o.Id,-12} {o.Name}");
+                    if (g.AllowNone)
+                        Console.WriteLine($"      {g.Id}=none");
+                }
+                Console.WriteLine();
+                Console.WriteLine("Select with: --select \"roads,streetlights=coffee,sunflare=none\"");
+                Console.WriteLine("Optional modules are off unless listed (or default ON); prefix '-' to disable a default-on module.");
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Parses a --select spec onto the package's default selection.
+        /// Tokens: "moduleId" (enable), "-moduleId" (disable), "groupId=optionId",
+        /// "groupId=none". Returns null (and sets errCode) on an unknown token.
+        /// </summary>
+        private static OivsSelection ParseSelection(OivsPackage pkg, string spec, out int errCode)
+        {
+            errCode = 0;
+            var sel = pkg.DefaultSelection();
+            if (string.IsNullOrWhiteSpace(spec)) return sel;
+
+            foreach (var rawToken in spec.Split(',', ';'))
+            {
+                string token = rawToken.Trim();
+                if (token.Length == 0) continue;
+
+                int eq = token.IndexOf('=');
+                if (eq >= 0)
+                {
+                    string gid = token.Substring(0, eq).Trim();
+                    string oid = token.Substring(eq + 1).Trim();
+                    var grp = pkg.FindGroup(gid);
+                    if (grp == null)
+                    {
+                        Console.WriteLine($"Error: unknown group '{gid}' in --select.");
+                        errCode = 2; return null;
+                    }
+                    bool none = oid.Equals("none", StringComparison.OrdinalIgnoreCase);
+                    var opt = none ? null : grp.FindOption(oid);
+                    if (!none && opt == null)
+                    {
+                        Console.WriteLine($"Error: group '{gid}' has no option '{oid}'.");
+                        errCode = 2; return null;
+                    }
+                    sel.GroupChoices[grp.Id] = none ? "none" : opt.Id;
+                }
+                else
+                {
+                    bool disable = token.StartsWith("-") || token.StartsWith("!");
+                    string mid = disable ? token.Substring(1).Trim() : token;
+                    var mod = pkg.FindModule(mid);
+                    if (mod == null)
+                    {
+                        Console.WriteLine($"Error: unknown module '{mid}' in --select.");
+                        errCode = 2; return null;
+                    }
+                    if (mod.Required && disable)
+                    {
+                        Console.WriteLine($"Note: module '{mid}' is required and cannot be disabled.");
+                        continue;
+                    }
+                    if (disable) sel.EnabledModules.Remove(mod.Id);
+                    else sel.EnabledModules.Add(mod.Id);
+                }
+            }
+            return sel;
+        }
+
+        /// <summary>
         /// Uninstalls a mod package by name
         /// </summary>
         public static int RunUninstall(string packageName, string gameFolder, bool useVanilla)
@@ -687,8 +888,8 @@ namespace CodeWalker.OIVInstaller
                         targetPackage = pkg;
                         break;
                     }
-                    // Package name contains search term (User typed "Core" and we found "CoreFX")
-                    // BUT NOT the other way around (User typed "CoreFX Roads" and we found "CoreFX" -> BAD)
+                    // Package name contains search term (User typed "My" and we found "MyMod")
+                    // BUT NOT the other way around (User typed "MyMod Roads" and we found "MyMod" -> BAD)
                     if (pkg.PackageName.Contains(packageName, StringComparison.OrdinalIgnoreCase))
                     {
                         targetPackage = pkg;

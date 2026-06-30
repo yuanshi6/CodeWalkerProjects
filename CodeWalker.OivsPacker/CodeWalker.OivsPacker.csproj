@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>CodeWalker.OivsPacker</AssemblyName>
+    <RootNamespace>CodeWalker.OivsPacker</RootNamespace>
+    <!-- 'backup\' holds stale copies; never include in the build -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);backup\**</DefaultItemExcludes>
+  </PropertyGroup>
+
+</Project>

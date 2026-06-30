@@ -59,6 +59,22 @@ namespace CodeWalker.OIVInstaller
             return package;
         }
 
+        /// <summary>
+        /// Creates a synthetic package from a pre-extracted content folder and a
+        /// pre-built operation list. Used by the Super OIV (.oivs) installer, which
+        /// assembles the operations for the user's selected modules/options and
+        /// runs them through the existing OivInstaller engine.
+        /// </summary>
+        public static OivPackage CreateSynthetic(OivMetadata metadata, string contentPath, List<OivOperation> operations, byte[] iconData = null)
+        {
+            var package = new OivPackage();
+            package.Metadata = metadata ?? new OivMetadata();
+            package.ContentPath = contentPath;
+            package.Operations = operations ?? new List<OivOperation>();
+            package.IconData = iconData;
+            return package;
+        }
+
         private void LoadInternal(string oivPath)
         {
             // OIV files are ZIP archives
@@ -249,12 +265,17 @@ namespace CodeWalker.OIVInstaller
             Metadata.IconBackground = GetNodeText(node, "iconBackground");
         }
 
-        private void ParseContent(XmlNode node, List<OivOperation> operations)
+        /// <summary>
+        /// Parses an OIV-grammar &lt;content&gt; node into a list of operations.
+        /// Public+static so the Super OIV (.oivs) parser can reuse the exact same
+        /// operation grammar without duplicating it.
+        /// </summary>
+        public static void ParseContent(XmlNode node, List<OivOperation> operations)
         {
             foreach (XmlNode child in node.ChildNodes)
             {
                 if (child.NodeType != XmlNodeType.Element) continue;
-                
+
                 var op = ParseOperation(child);
                 if (op != null)
                 {
@@ -263,7 +284,7 @@ namespace CodeWalker.OIVInstaller
             }
         }
 
-        private OivOperation ParseOperation(XmlNode node)
+        private static OivOperation ParseOperation(XmlNode node)
         {
             switch (node.Name.ToLowerInvariant())
             {
@@ -290,7 +311,7 @@ namespace CodeWalker.OIVInstaller
             }
         }
 
-        private OivArchiveOperation ParseArchiveOperation(XmlNode node)
+        private static OivArchiveOperation ParseArchiveOperation(XmlNode node)
         {
             var op = new OivArchiveOperation();
             
@@ -319,7 +340,7 @@ namespace CodeWalker.OIVInstaller
             return op;
         }
 
-        private OivAddOperation ParseAddOperation(XmlNode node)
+        private static OivAddOperation ParseAddOperation(XmlNode node)
         {
             var op = new OivAddOperation();
             op.Source = node.Attributes?["source"]?.Value ?? "";
@@ -327,14 +348,14 @@ namespace CodeWalker.OIVInstaller
             return op;
         }
 
-        private OivDeleteOperation ParseDeleteOperation(XmlNode node)
+        private static OivDeleteOperation ParseDeleteOperation(XmlNode node)
         {
             var op = new OivDeleteOperation();
             op.Target = node.InnerText;
             return op;
         }
 
-        private OivTextOperation ParseTextOperation(XmlNode node)
+        private static OivTextOperation ParseTextOperation(XmlNode node)
         {
             var op = new OivTextOperation();
             op.FilePath = node.Attributes?["path"]?.Value ?? "";
@@ -386,7 +407,7 @@ namespace CodeWalker.OIVInstaller
             return op;
         }
 
-        private OivInsertOperation ParseInsertOperation(XmlNode node)
+        private static OivInsertOperation ParseInsertOperation(XmlNode node)
         {
             var op = new OivInsertOperation();
             op.Where = node.Attributes?["where"]?.Value ?? "Before";
@@ -396,7 +417,7 @@ namespace CodeWalker.OIVInstaller
             return op;
         }
 
-        private OivReplaceOperation ParseReplaceOperation(XmlNode node)
+        private static OivReplaceOperation ParseReplaceOperation(XmlNode node)
         {
             var op = new OivReplaceOperation();
             op.LinePattern = node.Attributes?["line"]?.Value ?? "";
@@ -405,7 +426,7 @@ namespace CodeWalker.OIVInstaller
             return op;
         }
 
-        private OivXmlOperation ParseXmlOperation(XmlNode node, bool isPso = false)
+        private static OivXmlOperation ParseXmlOperation(XmlNode node, bool isPso = false)
         {
             OivXmlOperation op = isPso ? new OivPsoOperation() : new OivXmlOperation();
             op.FilePath = node.Attributes?["path"]?.Value ?? "";
