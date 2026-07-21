@@ -33,9 +33,23 @@ namespace CodeWalker.OIVInstaller
         private Animator _formResizeAnimator;
         private HeaderColorPulser _headerPulser;
 
+        // AutoScaleMode.Font rescales every Designer coordinate at InitializeComponent
+        // time (baseline 7x15 = Segoe UI 9pt at 96 DPI), but the runtime layout math in
+        // this file was positioning the header/buttons/panels with raw designer-space
+        // pixel constants. On displays scaled above 100% those raw values land inside
+        // the already-scaled layout — header too short, title over the icon, and the
+        // right-anchored header buttons overlapping each other. Every runtime layout
+        // constant must go through SX/SY.
+        private readonly float _scaleX = 1f;
+        private readonly float _scaleY = 1f;
+        private int SX(int designPx) => (int)Math.Round(designPx * _scaleX);
+        private int SY(int designPx) => (int)Math.Round(designPx * _scaleY);
+
         public MainForm()
         {
             InitializeComponent();
+            _scaleX = CurrentAutoScaleDimensions.Width / 7F;
+            _scaleY = CurrentAutoScaleDimensions.Height / 15F;
             // Hide the original lblPackageName — we paint the title text ourselves on
             // pnlTitleClipping for sub-pixel scrolling smoothness. The Label still owns
             // font/color which the painter mirrors.
@@ -63,8 +77,9 @@ namespace CodeWalker.OIVInstaller
         private void UpdateTitleClipWidth()
         {
             if (pnlTitleClipping == null || btnDocs == null) return;
-            int target = btnDocs.Left - pnlTitleClipping.Left - 12;
-            if (target < 80) target = 80;
+            int target = btnDocs.Left - pnlTitleClipping.Left - SX(12);
+            int minWidth = SX(80);
+            if (target < minWidth) target = minWidth;
             if (pnlTitleClipping.Width != target)
             {
                 pnlTitleClipping.Width = target;
@@ -855,7 +870,7 @@ namespace CodeWalker.OIVInstaller
             Size textSize = TextRenderer.MeasureText(rtbDescription.Text, rtbDescription.Font, new Size(rtbDescription.Width, 0), TextFormatFlags.WordBreak);
 
             // Cap height at 250px (scroll if larger), min 35px
-            int targetHeight = Math.Min(Math.Max(textSize.Height + 20, 35), 250);
+            int targetHeight = Math.Min(Math.Max(textSize.Height + SY(20), SY(35)), SY(250));
 
             rtbDescription.Height = targetHeight;
 
@@ -863,22 +878,22 @@ namespace CodeWalker.OIVInstaller
             // the empty state we defer applying these so the crossfade snapshot still
             // shows the empty-state layout — otherwise panelPaths would visibly teleport
             // before the fade kicks in.
-            int spacer = 20;
-            int linkY = rtbDescription.Bottom + 4;
-            int linkH = Math.Max(linkInstructions.Height, 17);
-            int loadedPathsTop = linkY + linkH + 10;
+            int spacer = SY(20);
+            int linkY = rtbDescription.Bottom + SY(4);
+            int linkH = Math.Max(linkInstructions.Height, SY(17));
+            int loadedPathsTop = linkY + linkH + SY(10);
             int loadedInfoTop = loadedPathsTop + panelPaths.Height + spacer;
-            int requiredClientHeight = 100 + loadedInfoTop + panelInfo.Height + 30;
+            int requiredClientHeight = SY(100) + loadedInfoTop + panelInfo.Height + SY(30);
 
             // Hardcoded minimum height to ensure basic UI usability
-            int minHeight = 460;
+            int minHeight = SY(460);
 
             // Apply the required height, respecting the minimum
             int finalHeight = Math.Max(minHeight, requiredClientHeight);
 
             if (!wasEmpty)
             {
-                linkInstructions.Location = new Point(20, linkY);
+                linkInstructions.Location = new Point(SX(20), linkY);
                 panelPaths.Top = loadedPathsTop;
                 panelInfo.Top = loadedInfoTop;
                 panelAdditional.Top = loadedInfoTop;
@@ -1001,7 +1016,7 @@ namespace CodeWalker.OIVInstaller
             {
                 ViewTransitions.CrossFade(panelContent, () =>
                 {
-                    linkInstructions.Location = new Point(20, linkY);
+                    linkInstructions.Location = new Point(SX(20), linkY);
                     linkInstructions.Visible = true;
                     panelPaths.Top = loadedPathsTop;
                     panelInfo.Top = loadedInfoTop;
@@ -1013,7 +1028,7 @@ namespace CodeWalker.OIVInstaller
                     picIcon.Visible = true;
                     lblAuthor.Visible = true;
                 });
-                AnimateLayoutTransition(finalHeight, targetHeaderHeight: 100, durationMs: 280);
+                AnimateLayoutTransition(finalHeight, targetHeaderHeight: SY(100), durationMs: 280);
             }
         }
 
@@ -1026,19 +1041,22 @@ namespace CodeWalker.OIVInstaller
         private void AnimateLayoutTransition(int targetClientHeight, int targetHeaderHeight, int durationMs)
         {
             // Empty → loaded: reveal Install from just off-screen right; end positions
-            // are right-anchored against the current form width.
-            //   btnDocs:      Right margin 260 → Left = form_w - 100 - 260 = form_w - 360
-            //   btnUninstall: Right margin 150 → Left = form_w - 100 - 150 = form_w - 250
-            //   btnInstall:   Right margin  20 → Left = form_w - 120 -  20 = form_w - 140
+            // are right-anchored against the current form width. Right margins are
+            // design-space (Install 20, gaps of 10 between buttons at 100% scale) and
+            // the buttons' actual (already-scaled) widths do the rest, so the row can't
+            // self-overlap at 125/150% display scaling.
             int formWidth = this.ClientSize.Width;
             btnInstall.Left = formWidth;
             btnInstall.Visible = true;
+            int installX = formWidth - btnInstall.Width - SX(20);
+            int uninstallX = installX - btnUninstall.Width - SX(10);
+            int docsX = uninstallX - btnDocs.Width - SX(10);
             AnimateHeaderTransition(
                 targetClientHeight, targetHeaderHeight,
-                targetTitle: new Point(93, 15),
-                targetDocsX: formWidth - 360,
-                targetUninstallX: formWidth - 250,
-                targetInstallX: formWidth - 140,
+                targetTitle: new Point(SX(93), SY(15)),
+                targetDocsX: docsX,
+                targetUninstallX: uninstallX,
+                targetInstallX: installX,
                 hideInstallAtEnd: false,
                 durationMs);
         }
@@ -1046,13 +1064,17 @@ namespace CodeWalker.OIVInstaller
         private void AnimateLayoutTransitionToEmpty(int durationMs)
         {
             // Loaded → empty: slide Install off-screen right and reset Docs/Manage Mods
-            // to their empty-state slots (right margins 130 / 20).
+            // to their empty-state slots (Manage Mods right margin 20, 10 gap to Docs,
+            // in design-space pixels — actual scaled widths keep the row from
+            // overlapping on high-DPI displays).
             int formWidth = this.ClientSize.Width;
+            int uninstallX = formWidth - btnUninstall.Width - SX(20);
+            int docsX = uninstallX - btnDocs.Width - SX(10);
             AnimateHeaderTransition(
-                targetClientHeight: 380, targetHeaderHeight: 70,
-                targetTitle: new Point(24, 18),
-                targetDocsX: formWidth - 230,
-                targetUninstallX: formWidth - 120,
+                targetClientHeight: SY(380), targetHeaderHeight: SY(70),
+                targetTitle: new Point(SX(24), SY(18)),
+                targetDocsX: docsX,
+                targetUninstallX: uninstallX,
                 targetInstallX: formWidth,
                 hideInstallAtEnd: true,
                 durationMs);
@@ -1332,54 +1354,55 @@ namespace CodeWalker.OIVInstaller
                 // We need a custom dialog for 3 choices: Uninstall (Backup), Uninstall (Vanilla), Keep
                 using (var prompt = new Form())
                 {
-                    prompt.Width = 500;
-                    prompt.Height = 280;
+                    prompt.Font = this.Font;
+                    prompt.Width = SX(500);
+                    prompt.Height = SY(280);
                     prompt.Text = "Conflicting Installation Found";
                     prompt.StartPosition = FormStartPosition.CenterParent;
                     prompt.FormBorderStyle = FormBorderStyle.FixedDialog;
                     prompt.MaximizeBox = false;
                     prompt.MinimizeBox = false;
 
-                    var iconBox = new PictureBox { Image = SystemIcons.Warning.ToBitmap(), Size = new Size(32, 32), Location = new Point(20, 20) };
+                    var iconBox = new PictureBox { Image = SystemIcons.Warning.ToBitmap(), Size = new Size(SX(32), SY(32)), SizeMode = PictureBoxSizeMode.Zoom, Location = new Point(SX(20), SY(20)) };
                     prompt.Controls.Add(iconBox);
 
-                    var lbl = new Label 
-                    { 
+                    var lbl = new Label
+                    {
                         Text = $"Found {existingPackages.Count} existing installation(s) of '{_package.Metadata.Name}'.\n\n" +
                                "How would you like to proceed?",
-                        Location = new Point(70, 20),
-                        Size = new Size(400, 60)
+                        Location = new Point(SX(70), SY(20)),
+                        Size = new Size(SX(400), SY(60))
                     };
                     prompt.Controls.Add(lbl);
 
                     // Option 1: Revert to Backup (Standard)
-                    var btnBackup = new Button 
-                    { 
-                        Text = "Uninstall & Revert to Backups\n(Standard Update)", 
-                        Location = new Point(70, 90), 
-                        Size = new Size(380, 40),
+                    var btnBackup = new Button
+                    {
+                        Text = "Uninstall & Revert to Backups\n(Standard Update)",
+                        Location = new Point(SX(70), SY(90)),
+                        Size = new Size(SX(380), SY(40)),
                         DialogResult = DialogResult.Yes
                     };
                     btnBackup.Click += (s, ev) => { uninstallMode = UninstallMode.Backup; prompt.Close(); };
                     prompt.Controls.Add(btnBackup);
 
                     // Option 2: Revert to Vanilla
-                    var btnVanilla = new Button 
-                    { 
-                        Text = "Uninstall & Reset to Vanilla\n(Clean Reinstall)", 
-                        Location = new Point(70, 135), 
-                        Size = new Size(380, 40),
+                    var btnVanilla = new Button
+                    {
+                        Text = "Uninstall & Reset to Vanilla\n(Clean Reinstall)",
+                        Location = new Point(SX(70), SY(135)),
+                        Size = new Size(SX(380), SY(40)),
                         DialogResult = DialogResult.OK
                     };
                     btnVanilla.Click += (s, ev) => { uninstallMode = UninstallMode.Vanilla; prompt.Close(); };
                     prompt.Controls.Add(btnVanilla);
 
                     // Option 3: Keep (Stacking)
-                    var btnKeep = new Button 
-                    { 
-                        Text = "Keep Existing Files\n(Install on top / Stacking)", 
-                        Location = new Point(70, 180), 
-                        Size = new Size(380, 40),
+                    var btnKeep = new Button
+                    {
+                        Text = "Keep Existing Files\n(Install on top / Stacking)",
+                        Location = new Point(SX(70), SY(180)),
+                        Size = new Size(SX(380), SY(40)),
                         DialogResult = DialogResult.No
                     };
                     btnKeep.Click += (s, ev) => { prompt.Close(); };
@@ -1593,7 +1616,7 @@ namespace CodeWalker.OIVInstaller
             ViewTransitions.CrossFade(panelContent, () =>
             {
                 panelLog.Visible = false;
-                panelPaths.Top = 160;
+                panelPaths.Top = SY(160);
                 panelPaths.Visible = true;
                 panelEmptyState.Visible = true;
                 rtbDescription.Visible = false;

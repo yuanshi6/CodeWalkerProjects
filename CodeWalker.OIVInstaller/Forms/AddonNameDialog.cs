@@ -96,6 +96,11 @@ namespace CodeWalker.OIVInstaller
             this.Controls.AddRange(new Control[] { lbl, _txtName, _lblError, _btnOk, _btnCancel });
             this.AcceptButton = _btnOk;
             this.CancelButton = _btnCancel;
+
+            // Layout above is authored in 96-DPI design pixels — font autoscaling
+            // (same as the Designer forms) keeps it intact on 125/150% displays.
+            this.AutoScaleDimensions = new SizeF(7F, 15F);
+            this.AutoScaleMode = AutoScaleMode.Font;
         }
 
         private void ValidateInput()

@@ -493,7 +493,7 @@ namespace CodeWalker.OIVInstaller
                         // THIS IS TRICKY without storing valid reference.
                         // Strategy: Use the AddedXml to find the node within the parent.
                         
-                        var parent = xmlDoc.SelectSingleNode(op.XPath);
+                        var parent = XmlCaseTolerant.SelectSingleNode(xmlDoc, op.XPath, out _);
                         if (parent != null)
                         {
                             // Try to find the child that matches our added XML
@@ -534,7 +534,7 @@ namespace CodeWalker.OIVInstaller
                     else if (op.Type == "Replace")
                     {
                         // To revert Replace: Find node at XPath and restore RemovedXml
-                        var node = xmlDoc.SelectSingleNode(op.XPath);
+                        var node = XmlCaseTolerant.SelectSingleNode(xmlDoc, op.XPath, out _);
                         if (node != null && node.ParentNode != null)
                         {
                             var fragment = xmlDoc.CreateDocumentFragment();

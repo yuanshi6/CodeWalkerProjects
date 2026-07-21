@@ -146,7 +146,7 @@ namespace CodeWalker.OIVInstaller
                     prompt.MaximizeBox = false;
                     prompt.MinimizeBox = false;
 
-                    var iconBox = new PictureBox { Image = SystemIcons.Question.ToBitmap(), Size = new Size(32, 32), Location = new Point(20, 20) };
+                    var iconBox = new PictureBox { Image = SystemIcons.Question.ToBitmap(), Size = new Size(32, 32), SizeMode = PictureBoxSizeMode.Zoom, Location = new Point(20, 20) };
                     prompt.Controls.Add(iconBox);
 
                     var lbl = new Label
@@ -187,6 +187,11 @@ namespace CodeWalker.OIVInstaller
                     btnCancel.Click += (s, ev) => { prompt.Close(); };
                     prompt.Controls.Add(btnCancel);
                     prompt.CancelButton = btnCancel;
+
+                    // Layout above is authored in 96-DPI design pixels — font
+                    // autoscaling keeps the dialog intact on 125/150% displays.
+                    prompt.AutoScaleDimensions = new SizeF(7F, 15F);
+                    prompt.AutoScaleMode = AutoScaleMode.Font;
 
                     var result = prompt.ShowDialog(this);
                     if (result == DialogResult.Cancel) return;

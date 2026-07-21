@@ -76,6 +76,12 @@ namespace CodeWalker.OIVInstaller
             BuildBottomBar();   // Bottom
             BuildHeader();      // Top (front-most edge)
 
+            // Layout above is authored in 96-DPI design pixels — opt into the same
+            // font-based autoscaling the Designer forms use so displays at 125/150%
+            // scaling get proportionally sized controls instead of clipped text.
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+
             // initial preview = base module (or first item)
             if (_pkg.Modules.Count > 0) ShowPreview(_pkg.Modules[0]);
         }

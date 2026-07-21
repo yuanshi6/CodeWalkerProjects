@@ -40,6 +40,11 @@ namespace CodeWalker.OivsPacker
             RebuildTree();
             SelectPackageRoot();
 
+            // Layout above is authored in 96-DPI design pixels — font autoscaling
+            // keeps it intact on 125/150% displays (same fix as the installer forms).
+            AutoScaleDimensions = new SizeF(7F, 15F);
+            AutoScaleMode = AutoScaleMode.Font;
+
             // Drag-and-drop: .oiv -> module, folder -> module, image(s) -> media,
             // .oivsproj -> open.
             AllowDrop = true;
@@ -73,6 +78,7 @@ namespace CodeWalker.OivsPacker
             _toolbar.Items.Add(Btn("Preview", (s, e) => PreviewInInstaller()));
             _toolbar.Items.Add(Btn("Export .oivs", (s, e) => ExportOivs(), accent: true));
             _toolbar.Items.Add(new ToolStripSeparator());
+            _toolbar.Items.Add(Btn("About OIVS", (s, e) => ShowWelcome()));
             _toolbar.Items.Add(Btn("Help", (s, e) => ShowHelp()));
             Controls.Add(_toolbar);
         }
@@ -725,6 +731,25 @@ namespace CodeWalker.OivsPacker
             if (d.ShowDialog() != DialogResult.OK) return null;
             _settings.InstallerPath = d.FileName;
             return d.FileName;
+        }
+
+        /// <summary>OIVS-format intro. Auto-shown on startup until opted out;
+        /// reopenable any time from the "About OIVS" toolbar button.</summary>
+        private void ShowWelcome()
+        {
+            using var w = new WelcomeForm(_settings.ShowWelcome);
+            w.ShowDialog(this);
+            if (w.ShowOnStartup != _settings.ShowWelcome)
+            {
+                _settings.ShowWelcome = w.ShowOnStartup;
+                _settings.Save();
+            }
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            if (_settings.ShowWelcome) ShowWelcome();
         }
 
         private void ShowHelp()

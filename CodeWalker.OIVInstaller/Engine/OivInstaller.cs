@@ -819,12 +819,13 @@ namespace CodeWalker.OIVInstaller
             string contentTrimmed = addOp.Content.Trim();
 
             // Find target node using XPath
-            var targetNode = xmlDoc.SelectSingleNode(addOp.XPath);
+            var targetNode = XmlCaseTolerant.SelectSingleNode(xmlDoc, addOp.XPath, out bool ciMatch);
             if (targetNode == null)
             {
                 Log($"  WARNING: XPath not found: {addOp.XPath}");
                 return;
             }
+            if (ciMatch) Log($"  Note: XPath matched case-insensitively: {addOp.XPath}");
 
             string appendMode = addOp.Append ?? "Last";
 
@@ -915,7 +916,10 @@ namespace CodeWalker.OIVInstaller
             {
                 // Content isn't well-formed XML on its own (e.g. raw text fragment).
                 // Fall back to a direct text comparison against container's inner XML.
-                return NormalizeXmlForCompare(container.InnerXml).Contains(NormalizeXmlForCompare(content));
+                // Case-insensitive: GTA data names are joaat-hashed, so "BURRITO4"
+                // and "burrito4" are the same entry to the game.
+                return NormalizeXmlForCompare(container.InnerXml).IndexOf(
+                    NormalizeXmlForCompare(content), StringComparison.OrdinalIgnoreCase) >= 0;
             }
 
             var newKeys = new List<string>();
@@ -928,7 +932,9 @@ namespace CodeWalker.OIVInstaller
             }
             if (newKeys.Count == 0) return false;
 
-            var existingKeys = new HashSet<string>(StringComparer.Ordinal);
+            // OrdinalIgnoreCase: GTA data names are joaat-hashed (case-insensitive),
+            // so an existing <Name>BURRITO4</Name> is a duplicate of <Name>burrito4</Name>.
+            var existingKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (XmlNode child in container.ChildNodes)
             {
                 if (child.NodeType == XmlNodeType.Element)
@@ -952,12 +958,13 @@ namespace CodeWalker.OIVInstaller
 
         private void ApplyXmlReplaceOperation(XmlDocument xmlDoc, OivXmlReplaceOperation op, List<XmlEditOperation> trackOps)
         {
-            var node = xmlDoc.SelectSingleNode(op.XPath);
+            var node = XmlCaseTolerant.SelectSingleNode(xmlDoc, op.XPath, out bool ciMatch);
             if (node == null)
             {
                 Log($"  WARNING: XPath not found for replace: {op.XPath}");
                 return;
             }
+            if (ciMatch) Log($"  Note: XPath matched case-insensitively: {op.XPath}");
 
             string oldXml = node.OuterXml;
 
@@ -980,12 +987,13 @@ namespace CodeWalker.OIVInstaller
 
         private void ApplyXmlRemoveOperation(XmlDocument xmlDoc, OivXmlRemoveOperation op, List<XmlEditOperation> trackOps)
         {
-            var node = xmlDoc.SelectSingleNode(op.XPath);
+            var node = XmlCaseTolerant.SelectSingleNode(xmlDoc, op.XPath, out bool ciMatch);
             if (node == null)
             {
                 Log($"  WARNING: XPath not found for remove: {op.XPath}");
                 return;
             }
+            if (ciMatch) Log($"  Note: XPath matched case-insensitively: {op.XPath}");
 
             string oldXml = node.OuterXml;
 
@@ -1379,46 +1387,36 @@ namespace CodeWalker.OIVInstaller
                 return;
             }
 
-            // 2. Load File into CodeWalker Object and Convert to XML
+            // 2. Convert to XML via CodeWalker's own extension routing. The previous
+            // per-extension loaders passed a null RpfFileEntry into Load(), which
+            // throws immediately (every Load() starts with Name = entry.Name) — so
+            // every binary <pso> edit on .ytyp/.ymap/.ymf/.pso failed with
+            // "Failed to parse/convert". MetaXml.GetXml(entry, data, ...) is the
+            // same proven path the <xml> operation uses for binary files.
             string xmlContent = "";
             string virtualXmlName = "";
+            bool isBinary = false;
 
-            try 
+            try
             {
-                if (ext == ".ymt")
+                if (fileEntry == null)
                 {
-                    var f = new YmtFile(); f.Load(fileData, fileEntry);
-                    xmlContent = MetaXml.GetXml(f, out virtualXmlName);
+                    // Disk file: synthesize an entry (strips + honors any RSC7
+                    // resource header) the same way CodeWalker's explorer does.
+                    fileEntry = CreateDiskFileEntry(fileName, filePath, ref fileData);
                 }
-                else if (ext == ".ymf")
+
+                if (ext != ".xml")
                 {
-                    var f = new YmfFile(); f.Load(fileData, null);
-                    xmlContent = MetaXml.GetXml(f, out virtualXmlName);
+                    xmlContent = MetaXml.GetXml(fileEntry, fileData, out virtualXmlName, "");
+                    isBinary = !string.IsNullOrEmpty(xmlContent);
                 }
-                else if (ext == ".ymap")
+
+                if (!isBinary)
                 {
-                    var f = new YmapFile(); f.Load(fileData, null);
-                    xmlContent = MetaXml.GetXml(f, out virtualXmlName);
-                }
-                else if (ext == ".ytyp")
-                {
-                    var f = new YtypFile(); f.Load(fileData, null);
-                    xmlContent = MetaXml.GetXml(f, out virtualXmlName);
-                }
-                else if (ext == ".pso")
-                {
-                    var f = new JPsoFile(); f.Load(fileData, null);
-                    xmlContent = MetaXml.GetXml(f, out virtualXmlName);
-                }
-                else if (ext == ".xml")
-                {
+                    // Plain-text XML (.xml/.meta, or an extension GetXml doesn't know).
                     xmlContent = TrimBom(Encoding.UTF8.GetString(fileData));
                     virtualXmlName = fileName;
-                }
-                else
-                {
-                    Log($"  ERROR: Unsupported PSO file extension: {ext}");
-                    return;
                 }
             }
             catch (Exception ex)
@@ -1466,16 +1464,16 @@ namespace CodeWalker.OIVInstaller
 
             // 4. Convert XML back to Binary
             byte[] newBytes = null;
-            try 
+            try
             {
-                if (ext == ".xml")
+                if (!isBinary)
                 {
                     newBytes = Encoding.UTF8.GetBytes(xmlDoc.OuterXml);
                 }
                 else
                 {
                     int trimLen = 0;
-                    MetaFormat format = XmlMeta.GetXMLFormat(virtualXmlName, out trimLen);
+                    MetaFormat format = XmlMeta.GetXMLFormat(virtualXmlName.ToLowerInvariant(), out trimLen);
                     newBytes = XmlMeta.GetData(xmlDoc, format, virtualXmlName);
                 }
             }
@@ -1523,6 +1521,36 @@ namespace CodeWalker.OIVInstaller
                     Log($"  ERROR: Failed to write file {fullPath}: {ex.Message}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Builds an RpfFileEntry for a file loaded from disk (outside any RPF), so
+        /// the MetaXml/GetFile pipeline can parse it exactly like an in-RPF file.
+        /// RSC7 resource headers are stripped and the payload decompressed; anything
+        /// else becomes a plain binary entry. Mirrors CodeWalker's explorer.
+        /// </summary>
+        private static RpfFileEntry CreateDiskFileEntry(string name, string path, ref byte[] data)
+        {
+            RpfFileEntry e;
+            uint rsc7 = (data?.Length > 4) ? BitConverter.ToUInt32(data, 0) : 0;
+            if (rsc7 == 0x37435352) //RSC7 header present — resource file
+            {
+                e = RpfFile.CreateResourceFileEntry(ref data, 0);
+                data = ResourceBuilder.Decompress(data);
+            }
+            else
+            {
+                var be = new RpfBinaryFileEntry();
+                be.FileSize = (uint)(data?.Length ?? 0);
+                be.FileUncompressedSize = be.FileSize;
+                e = be;
+            }
+            e.Name = name;
+            e.NameLower = name?.ToLowerInvariant();
+            e.NameHash = JenkHash.GenHash(e.NameLower);
+            e.ShortNameHash = JenkHash.GenHash(Path.GetFileNameWithoutExtension(e.NameLower));
+            e.Path = path;
+            return e;
         }
 
         private int CountOperations(List<OivOperation> operations)

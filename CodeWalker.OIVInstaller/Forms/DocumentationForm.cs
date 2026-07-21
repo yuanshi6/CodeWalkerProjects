@@ -87,6 +87,11 @@ namespace CodeWalker.OIVInstaller
             bottomPanel.Controls.Add(btnClose);
             
             this.Controls.Add(bottomPanel);
+
+            // Layout above is authored in 96-DPI design pixels — font autoscaling
+            // (same as the Designer forms) keeps it intact on 125/150% displays.
+            this.AutoScaleDimensions = new SizeF(7F, 15F);
+            this.AutoScaleMode = AutoScaleMode.Font;
         }
 
         private string GetUserGuideText()

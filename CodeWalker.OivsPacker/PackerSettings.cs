@@ -13,6 +13,7 @@ namespace CodeWalker.OivsPacker
         public string LastDir { get; set; } = "";        // last open/save/export folder
         public string InstallerPath { get; set; } = "";  // CodeWalker.OIVInstaller.exe for Preview
         public int MaxImageWidth { get; set; } = 1920;   // preview downscale width
+        public bool ShowWelcome { get; set; } = true;    // first-run OIVS format intro
 
         private static string PathOnDisk =>
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
