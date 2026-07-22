@@ -1,0 +1,6 @@
+{
+  "Game": { "LegacyPath": "", "EnhancedPath": "", "PreferredEdition": "auto" },
+  "Paths": { "Workspace": "./data/workspaces", "Backups": "./data/backups", "Logs": "./data/logs", "Previews": "./data/previews", "Database": "./data/agent.db" },
+  "Security": { "AllowOriginalArchiveWrites": false, "RequireModsFolder": true, "RequireBackup": true, "BlockWhenGameRunning": true, "MaximumFileSizeMb": 2048, "MaximumNestedRpfDepth": 4, "ApprovalTokenMinutes": 10 },
+  "Mcp": { "Transport": "stdio", "LogToolCalls": true }
+}

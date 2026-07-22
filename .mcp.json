@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "gta-mod-agent": {
+      "command": "dotnet",
+      "args": ["run", "--project", "CodeWalker.Agent.Mcp/CodeWalker.Agent.Mcp.csproj", "--", "--config", "config/agentsettings.json"]
+    }
+  }
+}

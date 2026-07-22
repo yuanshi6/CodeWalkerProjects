@@ -29,6 +29,26 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodeWalker.Gen9Converter", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CodeWalker.OIVInstaller", "CodeWalker.OIVInstaller\CodeWalker.OIVInstaller.csproj", "{D7A8C2B1-5F3E-4A9D-B6C2-8E1F3D4A5B6C}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Abstractions", "CodeWalker.Agent.Abstractions\CodeWalker.Agent.Abstractions.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A101}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Security", "CodeWalker.Agent.Security\CodeWalker.Agent.Security.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A102}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Storage", "CodeWalker.Agent.Storage\CodeWalker.Agent.Storage.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A103}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Peds", "CodeWalker.Agent.Peds\CodeWalker.Agent.Peds.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A104}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Core", "CodeWalker.Agent.Core\CodeWalker.Agent.Core.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A105}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Worker", "CodeWalker.Agent.Worker\CodeWalker.Agent.Worker.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A106}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Mcp", "CodeWalker.Agent.Mcp\CodeWalker.Agent.Mcp.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A107}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Cli", "CodeWalker.Agent.Cli\CodeWalker.Agent.Cli.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A108}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Tests", "CodeWalker.Agent.Tests\CodeWalker.Agent.Tests.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A109}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CodeWalker.Agent.Preview", "CodeWalker.Agent.Preview\CodeWalker.Agent.Preview.csproj", "{4201E41A-440C-46D3-B5DF-B71EFEC9A110}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -170,6 +190,46 @@ Global
 		{D7A8C2B1-5F3E-4A9D-B6C2-8E1F3D4A5B6C}.Release|x64.Build.0 = Release|Any CPU
 		{D7A8C2B1-5F3E-4A9D-B6C2-8E1F3D4A5B6C}.Release|x86.ActiveCfg = Release|Any CPU
 		{D7A8C2B1-5F3E-4A9D-B6C2-8E1F3D4A5B6C}.Release|x86.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A101}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A101}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A101}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A101}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A102}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A102}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A102}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A102}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A103}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A103}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A103}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A103}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A104}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A104}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A104}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A104}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A105}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A105}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A105}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A105}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A106}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A106}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A106}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A106}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A107}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A107}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A107}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A107}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A108}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A108}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A108}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A108}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A109}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A109}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A109}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A109}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A110}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A110}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A110}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4201E41A-440C-46D3-B5DF-B71EFEC9A110}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
