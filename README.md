@@ -1,78 +1,115 @@
-<div align="center">
-    <h1>CodeWalker by dexyfex</h1>
-    This program is for viewing the contents of GTAV RPF archives.
-</div>
+# GTA Mod Agent MCP
 
-# NEW: CodeWalker OIV Installer
-A standalone application included with CodeWalker for installing `.oiv` mod packages. It supports both **Legacy** and **Enhanced** editions of GTA V, features a **Smart Uninstall** system for clean removal of mods (including text/XML edits and Add-on DLCs), and handles OpenIV Package Format 2.2.
+面向 GTA V 单机模组的本地 MCP（Model Context Protocol）服务。它复用 CodeWalkerProjects 的 RPF 解析能力，并为后续 OIV 安装工作流提供基础，为 Codex、Claude Code 等 Agent 提供**可观察、受控、可验证、可回滚**的模组文件操作能力。
 
+作者：**yuanshi6**
 
-## Requirements:
-- PC version of GTA:V;
-- 4GB RAM (8+ recommended);
-- Windows 7 and above, x64 processor;
-- .NET framework 4.5 or newer from [Microsoft](https://www.microsoft.com/net/download/thank-you/net471);
-- DirectX 11 and Shader Model 4.0 capable graphics.
+> 本项目仅面向 GTA V 单机模组管理。不会提供 GTA Online 相关自动化，也不会允许 Agent 执行任意命令或写入原版游戏档案。
 
-# App Usage:
-On first startup, the app will prompt to browse for the GTA:V game folder. If you have the Steam version installed
-in the default location `(C:\Program Files (x86)\Steam\SteamApps\common\Grand Theft Auto V)`, then this step will be skipped automatically.
+## 已实现功能
 
-The World View will load by default. It will take a while to load. Use the WASD keys to move the camera. Hold shift to move faster. Drag the left mouse button to rotate the view. Use the mouse wheel to zoom in/out, and change the base movement speed. (Zoom in = slower motion) Xbox controller input is also supported. The Toolbox can be shown by clicking the `<<` button in the top right-hand corner of the screen. `T` opens the main toolbar.
+### 读取、查询与分析
 
-First-person mode can be activated with the P key, or by pressing the Start button on the XBox controller. While in first-person mode, the left mouse button (or right trigger) will fire an egg.
+- 扫描 GTA V 安装目录，并识别 Legacy / Enhanced 版本。
+- 列出 RPF 目录或完整树：`rpf_list`、`rpf_tree`。
+- 搜索、查看统计信息、读取文本/XML、提取受大小限制的文件：`rpf_search`、`rpf_stat`、`rpf_read_text`、`rpf_read_xml`、`rpf_extract`。
+- 获取资源基础信息和 SHA-256 哈希：`resource_inspect`。
+- 分析目录、ZIP、RAR、7z、OIV 与 RPF 模组包：`mod_inspect`。
+- 校验 Add-on Ped 的 `.ydd`、`.yft`、`.ymt`、`.ytd` 文件是否齐全且命名一致：`ped_analyze`。
+- 在临时工作区生成独立 Ped DLC RPF；不会直接写入游戏：`ped_build_addon`。
 
-Entities can be selected (with the right mouse button) by enabling the option on the Selection tab in the toolbox. The details of the selected entity, its archetype, and its drawable can be explored in the relevant sub-tabs. (This option can also be activated with the arrow button on the toolbar).
+### 受控写入与回滚
 
-When an entity is selected, `E` will switch to edit mode (or alternatively, edit mode can be activated by switching the Widget mode to anything other than Default). When in edit mode, `Q` will exit edit mode, `W` toggles the position widget, E toggles rotation, and R toggles scale. Also when in edit mode, movement is still WSAD, but only while you're holding the left mouse button down, and not interacting with the widget. `Ctrl-Z` and `Ctrl-Y` will Undo and Redo entity transformation (position/rotation/scale) actions.
+写入不会直接执行。必须按以下流程操作：
 
-The Project Window allows a CodeWalker project to be created (`.cwproj`), and files added to it. Editing entities while the Project Window is open will add the entity's `.ymap` to the current project. `Ymap` files can then be saved to disk, for use in a map mod. New `ymap` files can also be created, and entities can be added and removed. Also supported for editing are `.ynd` files (traffic paths), trains `.dat files` (train tracks), and scenarios (`.ymt`). (A full tutorial on making map mods is out of the scope of this readme.)
+```text
+operation_create
+  → rpf_stage_add / replace / delete / text_edit / xml_edit
+  → operation_validate
+  → operation_commit（携带一次性确认令牌）
+```
 
-A full explanation of all the tools in this application is still on the to-do list! The user is currently left to explore the options at their own peril. Note some options may cause CodeWalker to crash, or otherwise stop working properly. Restart the program if this happens! Also note that this program is a constant work in progress, so bugs and crashes are to be expected. Some parts of the world do not yet render correctly, but expect updates in the future to fix these issues.
+- 支持对 `mods` 中的普通文件或 RPF 内部文件新增、替换、删除与文本/XML 修改。
+- `operation_validate` 会检查游戏进程、磁盘空间、路径和文件大小，并签发有效期 10 分钟的一次性确认令牌。
+- 提交前建立备份；提交失败时自动回滚。
+- 可通过 `operation_get`、`operation_list` 查看记录；`operation_rollback` 恢复已写入内容，`operation_cancel` 仅取消尚未提交的事务。
+- SQLite 保存事务、备份清单与调用审计。
 
-# Menu Mode:
-The app can also be started with a main menu instead of loading the world view. This can be useful for situations where the world
-view is not needed, and the world loading can be avoided. To activate the menu mode, run CodeWalker with the 'menu' command line argument, e.g: CodeWalker.exe menu.
+## 安全边界
 
-# Explorer Mode:
-The app can be started with the `'explorer'` command line argument. This displays an interface much like OpenIV, with a Windows-Explorer style interface for browsing the game's .rpf archives. Double-click on files to open them. Viewers for most file types are available, but hex view will be shown as a fallback. To activate the explorer mode, run the command: CodeWalker.exe explorer. Alternatively, run the CodeWalker Explorer batch file in the program's directory.
+- 原版 GTA 文件始终只读；仅允许写入 `<GTA 目录>\mods`。
+- 拒绝 `..` 路径穿越与符号链接逃逸。
+- GTA V 运行时拒绝写入。
+- 同一档案同一时间仅允许一个写事务。
+- 不提供 PowerShell、任意 C# 方法调用或任意路径写入工具。
 
-# Main Toolbar:
-The main toolbar is used to access most of the editing features in CodeWalker. Shortcuts for new, open and create files are provided. The selection mode can be changed with the "pointer" button. Move, rotate and scale buttons provide access to the different editing widget modes. Other shortcuts on the toolbar include buttons to open the Selection Info window, and the Project window. See the tooltips on the toolbar items for hints.
+## 快速开始
 
-# Project Window:
-The project window is the starting point for editing files in CodeWalker. Project files can be created, and files can be added to them. It is recommended to create and save a project file before adding files to be edited and saved. The tree view displays the files in the current project, and their contents.
+### 环境要求
 
-# YMAP Editing:
-New `YMAP` files can be created via the project window, and existing `YMAP` files can be edited. To edit an existing single player `YMAP`, first change codewalker DLC level to `patchday2ng`, and enable DLC. Open the toolbar, and enable Entity selection mode. Enable the Move widget with the toolbar Move button. Open the project window with the toolbar button. Changes made while the project window is open are automatically added to the project. Select an entity to edit by right clicking when the entity is moused over, and its bounding box shown in white. Move, rotate and/or scale the selected entity with the widget. When the first change is made, the entity's `YMAP` will be added to the current project. If no project is open, a new one will be created. The edited `YMAP` file can be saved to the drive using the File menu in the project window. After saving the file, it needs to be added into the mods folder. Using OpenIV, find the existing `YMAP` file using the search function (note: the correct path for the edited `YMAP` can be found in the selection info window in CodeWalker, when an entity is selected, look for `YMap`>`RpfFileEntry` in the selection info property grid). Replace the edited `YMAP` into a copy of the correct archive in the /mods folder. Newly created YMAPs can be added to DLC archives in the same manner.
+- Windows 10/11
+- .NET SDK 8.0
+- 已安装 GTA V PC 版（Legacy 或 Enhanced）
 
-# Train Tracks Editing:
-[TODO - write this!]
+### 配置
 
-# (YND) Traffic Paths Editing:
-[TODO - write this!]
+编辑 [config/agentsettings.json](config/agentsettings.json)，填写你的游戏路径：
 
-# (YMT) Scenario Regions Editing:
-[TODO: write this!] <br>
-See https://youtu.be/U0nrVL44Fb4 - Scenario Editing Tutorial
+```json
+{
+  "Game": {
+    "LegacyPath": "D:\\SteamLibrary\\steamapps\\common\\Grand Theft Auto V",
+    "EnhancedPath": "",
+    "PreferredEdition": "auto"
+  }
+}
+```
 
-# Regarding game files: (FYI)
+### 构建与运行
 
-The PC GTAV world is stored in the `RPF` archives in many different file formats. As expected, some formats are used for storing rendering-related content, for example the textures and 3d models, while other formats are used for storing game and engine related data.
+```powershell
+dotnet build CodeWalker.Agent.Mcp/CodeWalker.Agent.Mcp.csproj
+dotnet run --project CodeWalker.Agent.Cli/CodeWalker.Agent.Cli.csproj -- scan "D:\SteamLibrary\steamapps\common\Grand Theft Auto V"
+```
 
-The main formats when it comes to rendering GTAV content are:
-`.ytd` - Texture Dictionary - Stores texture data in a DirectX format convenient for loading to the GPU. 
-`.ydr` - Drawable - Contains a single asset's 3d model. Can contain a Texture Dictionary, and up to 4 LODs of a model.
-`.ydd` - Drawable Dictionary - A collection of Drawables packed into a single file.
-`.yft` - Fragment - Contains a Drawable, along with other metadata for example physics data.
+仓库根目录的 [.mcp.json](.mcp.json) 可作为 Codex/Claude Code 的本地 stdio MCP 配置示例。MCP 协议数据使用 stdout；服务日志仅写入 stderr。
 
-The content Assets are pieced together to create the GTAV world via MapTypes (Archetypes) and MapData (Entity placements). At a high level, Archetypes define objects that are placeable, and Entities define where those objects are placed to make up the world. The collision mesh data for the world is stored in Bounds files.
+## 项目结构
 
-### The formats for these are:
-`.ytyp` - MapTypes - Contains a group of MapTypes (Archetypes), each defining an object that could be placed.
-`.ymap` - MapData - Contains placements of Archetypes, each defining an Entity in the world.
-`.ybn` - Bounds - Contains collision mesh / bounding data for pieces of the world.
+```text
+CodeWalker.Agent.Abstractions  接口、DTO、错误码与统一工具结果
+CodeWalker.Agent.Core          GTA/RPF 读取、模组分析、事务化写入
+CodeWalker.Agent.Security      mods 白名单、进程保护、路径与档案锁
+CodeWalker.Agent.Storage       SQLite 事务、备份和审计记录
+CodeWalker.Agent.Mcp           stdio MCP Server 与工具注册
+CodeWalker.Agent.Cli           本地调试命令行入口
+CodeWalker.Agent.Peds          Ped 文件集验证模型
+CodeWalker.Agent.Preview       预览工作进程入口（开发中）
+CodeWalker.Agent.Worker        耗时任务工作进程入口（开发中）
+CodeWalker.Agent.Tests         单元与临时 RPF 集成测试
+```
 
-The EntityData contained within the MapData (`.ymap`) files forms the LOD hierarchy. This hierarchy is arranged such that the lowest detail version of the world, at the root of the hierarchy, is represented by a small number of large models that can all be rendered simultaneously to draw the world at a great distance. The next branch in the hierarchy splits each of these large models into a group of smaller objects, each represented in a higher detail than the previous level. This pattern is continued for up to 6 levels of detail. When rendering the world, the correct level of detail for each branch in the hierarchy needs to be determined, as obviously the highest detail objects cannot all be rendered at once due to limited computing resources.
+## 当前限制
 
-In CodeWalker, This is done by recursing the LOD tree from the roots, checking how far away from the camera the node's Entity is. If it is below a certain value, then the current level is used, otherwise it moves to the next higher level, depending on the LOD distance setting. (In the Ymap view, the highest LOD, ORPHANHD, is not rendered by default. The ORPHANHD entities can often be manually rendered by specifying the correct `strm ymap` file for the area in question in the `ymap` text box. The `strm ymap` name can often be found by mouse-selecting a high detail object in the area and noting what `ymap` the entity is contained in, in the selection details panel.)
+以下能力尚未完成，不应视为可用功能：
+
+- YTD 纹理 PNG、YFT/YDD/YDR 离屏 3D 截图与地图截图预览。
+- 一键 OIV 安装/卸载。
+- Add-on DLC 的自动启用、禁用和卸载工作流。
+- 后台 RPF 全量索引、批量预览与诊断报告。
+
+当前可通过底层事务工具安全完成受控写入；高层安装工作流会在后续版本接入同一事务与回滚机制。
+
+## 开发与验证
+
+```powershell
+dotnet test CodeWalker.Agent.Tests/CodeWalker.Agent.Tests.csproj
+```
+
+测试使用临时目录与新建测试 RPF，不会对真实 GTA 档案执行写入。
+
+更多 MCP 使用和安全说明见 [docs/GTA-Mod-Agent-MCP.md](docs/GTA-Mod-Agent-MCP.md)。
+
+## 致谢与许可
+
+本项目基于 [CodeWalkerProjects](https://github.com/yuanshi6/CodeWalkerProjects) 的 CodeWalker 基础代码与文件格式处理能力构建。请保留原项目及其作者 dexyfex 的版权、许可和第三方依赖声明；完整信息见 [Notice.txt](Notice.txt)。
